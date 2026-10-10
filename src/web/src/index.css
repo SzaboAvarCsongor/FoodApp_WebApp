@@ -42,7 +42,8 @@ p {
 
 /* inputs and buttons use the page font */
 button,
-input {
+input,
+select {
   font: inherit;
 }
 
@@ -58,6 +59,7 @@ a {
 /* show focus outline only for keyboard users */
 button:focus-visible,
 input:focus-visible,
+select:focus-visible,
 a:focus-visible {
   outline: 3px solid #f4a261;
   outline-offset: 3px;

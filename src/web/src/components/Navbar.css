@@ -1,0 +1,141 @@
+.navbar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  padding: 16px 0;
+  background: rgba(255, 253, 249, 0.92);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--border);
+}
+
+/* ---------- delivery address ---------- */
+.delivery-location {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--primary);
+}
+
+.delivery-location div {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+}
+
+.delivery-location strong {
+  color: var(--text);
+  font-size: 0.95rem;
+}
+
+.muted-label {
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+/* ---------- search ---------- */
+.nav-search {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 16px;
+  height: 46px;
+  border-radius: 999px;
+  background: #f6f1e9;
+  color: var(--muted);
+}
+
+.nav-search input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  outline: none;
+  color: var(--text);
+}
+
+/* ---------- cart ---------- */
+.cart-button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 46px;
+  padding: 0 18px;
+  border: none;
+  border-radius: 999px;
+  background: var(--text);
+  color: #fff;
+  font-weight: 600;
+  transition: transform 0.15s ease;
+}
+
+.cart-button:hover {
+  transform: translateY(-1px);
+}
+
+.cart-count {
+  display: grid;
+  place-items: center;
+  min-width: 24px;
+  height: 24px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--primary);
+  font-size: 0.8rem;
+}
+
+/* ---------- sign in button ---------- */
+.auth-button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 46px;
+  padding: 0 18px;
+  border: 1.5px solid var(--border);
+  border-radius: 999px;
+  background: var(--card);
+  color: var(--text);
+  font-weight: 600;
+  transition: all 0.15s ease;
+}
+
+.auth-button:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+/* ---------- responsive: tablet ---------- */
+@media (max-width: 900px) {
+  .delivery-location {
+    display: none;
+  }
+}
+
+/* ---------- responsive: mobile ---------- */
+@media (max-width: 600px) {
+  .navbar {
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  .nav-search {
+    order: 3;
+    flex-basis: 100%;
+  }
+
+  .cart-button {
+    margin-left: auto;
+  }
+
+  /* icon only on small screens */
+  .cart-label,
+  .auth-label {
+    display: none;
+  }
+
+  .auth-button {
+    padding: 0 14px;
+  }
+}
