@@ -72,7 +72,7 @@ CREATE TABLE orders (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   customer_id uuid NOT NULL REFERENCES profiles(id),
   restaurant_id uuid NOT NULL REFERENCES restaurants(id),
-  courier_id uuid REFERENCES courier_details(id), -- FONTOS: NULL engedélyezve, mert rendeléskor még nincs futár!
+  courier_id uuid REFERENCES courier_details(id),
   status order_status DEFAULT 'PENDING',
   total_price int NOT NULL,
   total_calories int,
@@ -108,3 +108,10 @@ CREATE TABLE job_application (
   status application_status DEFAULT 'PENDING',
   created_at timestamp DEFAULT now()
 );
+
+ALTER TABLE restaurants
+  ADD COLUMN category text,
+  ADD COLUMN image_url text,
+  ADD COLUMN delivery_fee int DEFAULT 0,
+  ADD COLUMN delivery_time_min int,
+  ADD COLUMN delivery_time_max int;
