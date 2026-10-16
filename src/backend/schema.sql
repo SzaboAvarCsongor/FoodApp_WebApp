@@ -115,3 +115,31 @@ ALTER TABLE restaurants
   ADD COLUMN delivery_fee int DEFAULT 0,
   ADD COLUMN delivery_time_min int,
   ADD COLUMN delivery_time_max int;
+
+ALTER TABLE profiles 
+  ALTER COLUMN email TYPE VARCHAR(100),
+  ALTER COLUMN full_name TYPE VARCHAR(50),
+  ALTER COLUMN phone TYPE VARCHAR(50);
+
+ALTER TABLE restaurants 
+  ALTER COLUMN name TYPE VARCHAR(50),
+  ALTER COLUMN address TYPE VARCHAR(100);
+
+ALTER TABLE menu_items 
+  ALTER COLUMN name TYPE VARCHAR(50),
+  ALTER COLUMN description TYPE VARCHAR(150),
+  ALTER COLUMN category TYPE VARCHAR(100);
+
+ALTER TABLE orders 
+  ALTER COLUMN delivery_address TYPE VARCHAR(150);
+
+ALTER TABLE reviews 
+  ALTER COLUMN comment TYPE VARCHAR(250);
+
+ALTER TABLE courier_details 
+  ALTER COLUMN vehicle_type TYPE VARCHAR(100),
+  ALTER COLUMN license_plate TYPE VARCHAR(50);
+
+ALTER TABLE job_application 
+  ALTER COLUMN position_type TYPE VARCHAR(100),
+  ALTER COLUMN message TYPE VARCHAR(250);
