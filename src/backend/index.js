@@ -1,7 +1,7 @@
 import express from 'express';
 import cors from 'cors';
-import { supabase } from './supabaseClient.js';
 import dotenv from 'dotenv';
+import restaurantRoutes from './routes/restaurantRoutes.js';
 
 dotenv.config();
 
@@ -11,27 +11,17 @@ const PORT = process.env.PORT || 3000;
 app.use(cors()); 
 app.use(express.json()); 
 
+app.use('/api/restaurants', restaurantRoutes);
+
 app.get('/', (req, res) => {
-  res.send('A FoodApp backend szerver sikeresen fut!');
+  res.send('Food Delivery API is running...');
 });
 
-app.get('/api/restaurants', async (req, res) => {
-  try {
-    const { data, error } = await supabase
-      .from('restaurants')
-      .select('*');
-
-    if (error) {
-      throw error;
-    }
-
-    res.json(data);
-  } catch (error) {
-    console.error('Error fetching restaurants:', error);
-    res.status(500).json({ error: 'Internal Server Error' });
-  }
+app.use((err, req, res, next) => {
+  console.error('Szerver hiba:', err.stack);
+  res.status(500).json({ error: 'Valami elromlott a szerveren!' });
 });
 
 app.listen(PORT, () => {
-  console.log(`Szerver elindítva a http://localhost:${PORT} címen`);
+  console.log(`A backend szerver fut a http://localhost:${PORT} címen`);
 });
