@@ -1,17 +1,26 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { X } from "lucide-react";
+import { useAuth, homePathForRole } from "../context/AuthContext";
 import "./AuthModal.css";
 
 function AuthModal({ onClose }) {
+  const { login, register } = useAuth();
+  const navigate = useNavigate();
+
   // which form is shown: "login" or "register"
   const [authMode, setAuthMode] = useState("login");
+
+  // error message shown above the submit button
+  const [error, setError] = useState("");
 
   // values typed into the form
   const [authForm, setAuthForm] = useState({
     fullName: "",
     email: "",
     password: "",
-    accountType: "CUSTOMER", // CUSTOMER, COURIER or RESTAURANT_ADMIN
+    accountType: "CUSTOMER", // CUSTOMER or RESTAURANT_ADMIN
+    restaurantCode: "", // only used for restaurant admins
   });
 
   // close the modal with the escape key
@@ -34,19 +43,40 @@ function AuthModal({ onClose }) {
 
   // switch between login and register
   function switchAuthMode() {
+    setError("");
     setAuthMode((current) => (current === "login" ? "register" : "login"));
   }
 
-  // submit the form (no backend yet)
+  // submit the form
   function handleAuthSubmit(event) {
     event.preventDefault();
+    setError("");
 
-    // todo: send authForm to the api (/api/auth/login or /api/auth/register)
-    // the backend decides the real role, accountType is only a request
-    console.log(authMode, authForm);
+    const result =
+      authMode === "login"
+        ? login(authForm)
+        : register({
+            ...authForm,
+            restaurantCode: authForm.restaurantCode.trim().toUpperCase(),
+          });
+
+    if (!result.ok) {
+      setError(result.error);
+      return;
+    }
 
     onClose();
+
+    // admins go to their dashboard, customers stay where they are (for example the cart)
+    const path = homePathForRole(result.user.role);
+    if (path !== "/") {
+      navigate(path);
+    }
   }
+
+  // the code box is only needed when registering as a restaurant admin
+  const showRestaurantCode =
+    authMode === "register" && authForm.accountType === "RESTAURANT_ADMIN";
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -117,11 +147,31 @@ function AuthModal({ onClose }) {
                 onChange={handleAuthChange}
               >
                 <option value="CUSTOMER">Vásárló</option>
-                <option value="COURIER">Futár</option>
                 <option value="RESTAURANT_ADMIN">Étterem</option>
               </select>
             </label>
           )}
+
+          {/* restaurant code, only for restaurant admins */}
+          {showRestaurantCode && (
+            <label className="field">
+              <span>Étterem kódja</span>
+              <input
+                type="text"
+                name="restaurantCode"
+                value={authForm.restaurantCode}
+                onChange={handleAuthChange}
+                placeholder="pl. NAPOLI-4821"
+                autoComplete="off"
+                required
+              />
+              <small className="field-hint">
+                A kódot az étterem regisztrációja után kapod meg.
+              </small>
+            </label>
+          )}
+
+          {error && <p className="auth-error">{error}</p>}
 
           <button className="primary-button auth-submit" type="submit">
             {authMode === "login" ? "Belépés" : "Fiók létrehozása"}

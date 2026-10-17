@@ -112,3 +112,18 @@
     padding: 32px 22px 24px;
   }
 }
+
+
+.field-hint {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.auth-error {
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: #ffe3e3;
+  color: #c92a2a;
+  font-size: 0.88rem;
+  font-weight: 600;
+}

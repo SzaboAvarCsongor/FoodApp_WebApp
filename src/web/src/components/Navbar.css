@@ -105,7 +105,21 @@
   border-color: var(--primary);
   color: var(--primary);
 }
+.nav-link {
+  color: var(--text);
+  font-weight: 600;
+  white-space: nowrap;
+}
 
+.nav-link:hover {
+  color: var(--primary);
+}
+
+@media (max-width: 900px) {
+  .nav-link {
+    font-size: 0.9rem;
+  }
+}
 /* ---------- responsive: tablet ---------- */
 @media (max-width: 900px) {
   .delivery-location {

@@ -4,9 +4,17 @@
 
 /* page container */
 .app {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
   max-width: 1280px;
   margin: 0 auto;
   padding: 0 24px;
+}
+
+/* every page fills the free space between the navbar and the footer */
+.app > main {
+  flex: 1;
 }
 
 /* ---------- shared: logo (navbar and footer) ---------- */
@@ -67,4 +75,18 @@
   .app {
     padding: 0 16px;
   }
+}
+
+.page-placeholder {
+  padding: 56px 0;
+}
+
+.page-placeholder h1 {
+  margin-bottom: 12px;
+  font-size: 2.2rem;
+  font-weight: 800;
+}
+
+.page-placeholder p {
+  color: var(--muted);
 }

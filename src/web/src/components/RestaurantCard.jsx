@@ -1,14 +1,40 @@
+import { useNavigate } from "react-router-dom";
 import { Clock, Star, Heart } from "lucide-react";
 import "./RestaurantCard.css";
 
 function RestaurantCard({ restaurant, isFavorite, onToggleFavorite }) {
+  const navigate = useNavigate();
+
+  // open the restaurant page
+  function openRestaurant() {
+    navigate(`/restaurant/${restaurant.id}`);
+  }
+
+  // open with the keyboard too
+  function handleKeyDown(event) {
+    if (event.key === "Enter") {
+      openRestaurant();
+    }
+  }
+
   // hide broken images so the emoji fallback is visible
   function handleImageError(event) {
     event.currentTarget.style.display = "none";
   }
 
+  // favorite click must not open the restaurant page
+  function handleFavoriteClick(event) {
+    event.stopPropagation();
+    onToggleFavorite(restaurant.id);
+  }
+
   return (
-    <article className="restaurant-card">
+    <article
+      className="restaurant-card"
+      onClick={openRestaurant}
+      onKeyDown={handleKeyDown}
+      tabIndex={0}
+    >
       <div
         className="restaurant-image"
         style={{ backgroundColor: restaurant.color }}
@@ -25,7 +51,7 @@ function RestaurantCard({ restaurant, isFavorite, onToggleFavorite }) {
         {/* favorite toggle */}
         <button
           className={`favorite-button ${isFavorite ? "favorited" : ""}`}
-          onClick={() => onToggleFavorite(restaurant.id)}
+          onClick={handleFavoriteClick}
           aria-label="Kedvencekhez adás"
         >
           <Heart size={19} fill={isFavorite ? "currentColor" : "none"} />

@@ -1,69 +1,9 @@
 import { useState } from "react";
 import { Star, Clock, ArrowRight } from "lucide-react";
 import RestaurantCard from "../components/RestaurantCard";
+import { categories, restaurants } from "../data/restaurants";
 import "./HomePage.css";
 
-// food categories shown as chips
-const categories = [
-  { name: "Pizza", emoji: "🍕" },
-  { name: "Burgerek", emoji: "🍔" },
-  { name: "Sushi", emoji: "🍣" },
-  { name: "Ázsiai", emoji: "🍜" },
-  { name: "Saláták", emoji: "🥗" },
-  { name: "Desszertek", emoji: "🍰" },
-];
-
-// test data until the backend is ready
-const restaurants = [
-  {
-    id: 1,
-    name: "Napoli Pizza",
-    category: "Pizza",
-    rating: 4.8,
-    time: "20–30 perc",
-    fee: "5 lej",
-    color: "#fff0e4",
-    emoji: "🍕",
-    image:
-      "https://images.unsplash.com/photo-1579751626657-72bc17010498?auto=format&fit=crop&w=800&q=80",
-  },
-  {
-    id: 2,
-    name: "Burger House",
-    category: "Burgerek",
-    rating: 4.7,
-    time: "25–35 perc",
-    fee: "4 lej",
-    color: "#fce8d5",
-    emoji: "🍔",
-    image:
-      "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=800&q=80",
-  },
-  {
-    id: 3,
-    name: "Sushi Garden",
-    category: "Sushi",
-    rating: 4.9,
-    time: "30–40 perc",
-    fee: "6 lej",
-    color: "#e6f0e8",
-    emoji: "🍣",
-    image:
-      "https://images.unsplash.com/photo-1579871494447-9811cf80d66c?auto=format&fit=crop&w=800&q=80",
-  },
-  {
-    id: 4,
-    name: "Green Bowl",
-    category: "Saláták",
-    rating: 4.6,
-    time: "15–25 perc",
-    fee: "3 lej",
-    color: "#e8f0df",
-    emoji: "🥗",
-    image:
-      "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?auto=format&fit=crop&w=800&q=80",
-  },
-];
 
 function HomePage({ search, onSearchChange }) {
   // store the selected category
