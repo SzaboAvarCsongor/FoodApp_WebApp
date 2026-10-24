@@ -143,3 +143,21 @@ ALTER TABLE courier_details
 ALTER TABLE job_application 
   ALTER COLUMN position_type TYPE VARCHAR(100),
   ALTER COLUMN message TYPE VARCHAR(250);
+
+ALTER TABLE restaurants ALTER COLUMN owner_id DROP NOT NULL;
+ALTER TABLE restaurants ADD COLUMN invite_code text UNIQUE;
+
+ALTER TABLE orders ADD COLUMN delivery_fee integer NOT NULL DEFAULT 0;
+
+CREATE TABLE job_posts (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  restaurant_id uuid NOT NULL REFERENCES restaurants(id) ON DELETE CASCADE,
+  title varchar(100) NOT NULL,
+  position_type varchar(100) NOT NULL,
+  description text,
+  created_at timestamp DEFAULT now()
+);
+
+ALTER TABLE job_application ADD COLUMN job_id uuid REFERENCES job_posts(id) ON DELETE CASCADE;
+
+ALTER TABLE reviews ADD CONSTRAINT reviews_rating_check CHECK (rating BETWEEN 1 AND 5);
