@@ -1,29 +1,14 @@
-import { createContext, useContext, useState, useEffect } from "react";
-import { restaurants as seedRestaurants } from "../data/restaurants";
+import { createContext, useContext, useState, useEffect, useCallback } from "react";
+import { useAuth } from "./AuthContext";
+import * as api from "../services/api";
+import { categories } from "../data/restaurants";
 
 const DataContext = createContext(null);
 
-const RESTAURANTS_KEY = "foodapp_restaurants";
-const ORDERS_KEY = "foodapp_orders";
 const JOBS_KEY = "foodapp_jobs";
+const ORDERS_KEY = "foodapp_orders";
 
-// invite codes of the test restaurants
-const seedCodes = {
-  1: "NAPOLI-4821",
-  2: "BURGER-1234",
-  3: "SUSHI-5566",
-  4: "GREEN-7788",
-};
-
-// seed restaurants get a code, an owner slot and an active flag
-const initialRestaurants = seedRestaurants.map((restaurant) => ({
-  ...restaurant,
-  code: seedCodes[restaurant.id],
-  ownerId: null,
-  active: true,
-}));
-
-// state that is saved to localstorage on every change
+// state that is saved to localstorage on every change (jobs only, for now)
 function useStored(key, initial) {
   const [value, setValue] = useState(() => {
     try {
@@ -45,145 +30,121 @@ function useStored(key, initial) {
   return [value, setValue];
 }
 
-// make a code like NAPOLI-4821 from the restaurant name
-function generateCode(name) {
-  const letters = name.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6);
-  const digits = Math.floor(1000 + Math.random() * 9000);
-  return `${letters || "REST"}-${digits}`;
+// emoji and color are not in the database, take them from the category
+function look(restaurant) {
+  return {
+    ...restaurant,
+    emoji: categories.find((c) => c.name === restaurant.category)?.emoji || "🍽️",
+    color: "#fff0e4",
+  };
 }
 
 export function DataProvider({ children }) {
-  const [restaurants, setRestaurants] = useStored(
-    RESTAURANTS_KEY,
-    initialRestaurants
-  );
+  const { user } = useAuth();
+
+  // public restaurants for everyone
+  const [restaurants, setRestaurants] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  // all restaurants with codes, super admin only
+  const [adminRestaurants, setAdminRestaurants] = useState([]);
+
+  // the restaurant of the logged in restaurant admin
+  const [myRestaurant, setMyRestaurant] = useState(null);
+
+  // still local until the backend has endpoints for them
   const [orders, setOrders] = useStored(ORDERS_KEY, []);
   const [jobs, setJobs] = useStored(JOBS_KEY, []);
 
-  // only active restaurants are shown to customers
-  const publicRestaurants = restaurants.filter((r) => r.active);
+  // load everything the current user can see
+  const reload = useCallback(async () => {
+    try {
+      const list = await api.fetchRestaurants();
+      setRestaurants(list.map(look));
+      setError("");
+    } catch {
+      setError("Az éttermeket nem sikerült betölteni.");
+    } finally {
+      setLoading(false);
+    }
 
-  // ---------- restaurants ----------
+    if (user?.role === "SUPER_ADMIN") {
+      try {
+        const all = await api.fetchAdminRestaurants();
+        setAdminRestaurants(all.map(look));
+      } catch {
+        setAdminRestaurants([]);
+      }
+    } else {
+      setAdminRestaurants([]);
+    }
 
-  // todo: replace with fetch to /api/restaurants
-  function addRestaurant({ name, category, emoji, fee, time, image }) {
-    const restaurant = {
-      id: Date.now(),
-      name,
-      category,
-      rating: 0,
-      time,
-      fee: `${fee} lej`,
-      color: "#fff0e4",
-      emoji,
-      image:
-        image ||
-        "https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=800&q=80",
-      menu: [],
-      code: generateCode(name),
-      ownerId: null,
-      active: true,
-    };
+    if (user?.role === "RESTAURANT_ADMIN") {
+      try {
+        const mine = await api.fetchMine();
+        setMyRestaurant(mine ? look(mine) : null);
+      } catch {
+        setMyRestaurant(null);
+      }
+    } else {
+      setMyRestaurant(null);
+    }
+  }, [user]);
 
-    setRestaurants((current) => [...current, restaurant]);
-    return restaurant;
+  useEffect(() => {
+    reload();
+  }, [reload]);
+
+  // ---------- restaurants (super admin) ----------
+
+  async function addRestaurant(values) {
+    const created = await api.createRestaurant(values);
+    await reload();
+    return created;
   }
 
-  function removeRestaurant(id) {
-    setRestaurants((current) => current.filter((r) => r.id !== id));
-    // jobs of a deleted restaurant make no sense anymore
-    setJobs((current) => current.filter((job) => job.restaurantId !== id));
+  async function removeRestaurant(id) {
+    try {
+      await api.deleteRestaurant(id);
+      await reload();
+    } catch (err) {
+      alert(err.message);
+    }
   }
 
   // show or hide a restaurant for customers
-  function toggleActive(id) {
-    setRestaurants((current) =>
-      current.map((r) => (r.id === id ? { ...r, active: !r.active } : r))
-    );
+  async function toggleActive(id) {
+    await api.toggleRestaurant(id);
+    await reload();
   }
 
-  // link a user to a restaurant (null frees the restaurant again)
-  function setOwner(id, ownerId) {
-    setRestaurants((current) =>
-      current.map((r) => (r.id === id ? { ...r, ownerId } : r))
-    );
+  // ---------- menu (restaurant admin) ----------
+
+  async function addMenuItem(item) {
+    try {
+      await api.addMenuItem(item);
+      await reload();
+    } catch (err) {
+      alert(err.message);
+    }
   }
 
-  // find a restaurant by its invite code
-  function findByCode(code) {
-    return restaurants.find((r) => r.code === code);
+  async function removeMenuItem(itemId) {
+    await api.deleteMenuItem(itemId);
+    await reload();
   }
 
-  function addMenuItem(restaurantId, item) {
-    setRestaurants((current) =>
-      current.map((r) =>
-        r.id === restaurantId
-          ? { ...r, menu: [...r.menu, { ...item, id: Date.now() }] }
-          : r
-      )
-    );
-  }
+  // ---------- orders (local, only for the restaurant panel for now) ----------
 
-  function removeMenuItem(restaurantId, itemId) {
-    setRestaurants((current) =>
-      current.map((r) =>
-        r.id === restaurantId
-          ? { ...r, menu: r.menu.filter((item) => item.id !== itemId) }
-          : r
-      )
-    );
-  }
-
-  // ---------- orders ----------
-
-  // todo: replace with fetch to POST /api/orders
-  function placeOrder({ customer, restaurant, items, deliveryFee, address }) {
-    const subtotal = items.reduce((sum, i) => sum + i.price * i.qty, 0);
-    const calories = items.reduce((sum, i) => sum + i.calories * i.qty, 0);
-
-    const order = {
-      id: `o-${Date.now()}`,
-      customerId: customer.id,
-      customerName: customer.fullName,
-      restaurantId: restaurant.id,
-      restaurantName: restaurant.name,
-      restaurantEmoji: restaurant.emoji,
-      // prices are saved at order time, later menu changes must not affect them
-      items: items.map((i) => ({
-        id: i.id,
-        name: i.name,
-        description: i.description,
-        category: i.category,
-        price: i.price,
-        qty: i.qty,
-        calories: i.calories,
-        protein: i.protein,
-        carbs: i.carbs,
-        fat: i.fat,
-      })),
-      subtotal,
-      deliveryFee,
-      total: subtotal + deliveryFee,
-      calories,
-      address,
-      status: "PENDING",
-      createdAt: new Date().toISOString(),
-    };
-
-    setOrders((current) => [order, ...current]);
-    return order;
-  }
-
-  // todo: replace with fetch to PATCH /api/orders/:id/status
   function setOrderStatus(orderId, status) {
     setOrders((current) =>
       current.map((o) => (o.id === orderId ? { ...o, status } : o))
     );
   }
 
-  // ---------- jobs ----------
+  // ---------- jobs (local for now) ----------
 
-  // todo: replace with fetch to POST /api/jobs
   function addJob(restaurantId, { title, type, description }) {
     const job = {
       id: `j-${Date.now()}`,
@@ -202,7 +163,6 @@ export function DataProvider({ children }) {
     setJobs((current) => current.filter((job) => job.id !== jobId));
   }
 
-  // todo: replace with fetch to POST /api/jobs/:id/apply
   function applyToJob(jobId, { userId, name, message, cvUrl }) {
     setJobs((current) =>
       current.map((job) =>
@@ -230,16 +190,18 @@ export function DataProvider({ children }) {
     <DataContext.Provider
       value={{
         restaurants,
-        publicRestaurants,
+        publicRestaurants: restaurants,
+        adminRestaurants,
+        myRestaurant,
+        loading,
+        error,
+        reload,
         addRestaurant,
         removeRestaurant,
         toggleActive,
-        setOwner,
-        findByCode,
         addMenuItem,
         removeMenuItem,
         orders,
-        placeOrder,
         setOrderStatus,
         jobs,
         addJob,

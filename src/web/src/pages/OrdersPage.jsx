@@ -1,18 +1,26 @@
+import { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { RotateCcw } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
-import { useData } from "../context/DataContext";
+import { fetchMyOrders } from "../services/api";
 import { statusLabels } from "../data/orderStatus";
 import "./Dashboard.css";
 import "./OrdersPage.css";
 
 function OrdersPage({ onReorder }) {
   const { user } = useAuth();
-  const { orders } = useData();
   const navigate = useNavigate();
 
-  // only the orders of the logged in customer
-  const myOrders = orders.filter((order) => order.customerId === user.id);
+  const [orders, setOrders] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  // load the orders of the logged in customer from the database
+  useEffect(() => {
+    fetchMyOrders(user.id)
+      .then(setOrders)
+      .catch(() => setOrders([]))
+      .finally(() => setLoading(false));
+  }, [user.id]);
 
   // fill the cart again and open it
   function handleReorder(order) {
@@ -27,7 +35,9 @@ function OrdersPage({ onReorder }) {
         <h1>Korábbi rendelések</h1>
       </div>
 
-      {myOrders.length === 0 ? (
+      {loading ? (
+        <p className="panel-empty">Betöltés...</p>
+      ) : orders.length === 0 ? (
         <div className="empty-state">
           <span>📦</span>
           <h3>Még nincs rendelésed</h3>
@@ -38,7 +48,7 @@ function OrdersPage({ onReorder }) {
         </div>
       ) : (
         <div className="orders-list">
-          {myOrders.map((order) => (
+          {orders.map((order) => (
             <article className="order-card" key={order.id}>
               <div className="order-top">
                 <div>

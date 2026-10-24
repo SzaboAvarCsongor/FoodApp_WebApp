@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Plus, Trash2, ExternalLink } from "lucide-react";
-import { useAuth } from "../../context/AuthContext";
 import { useData } from "../../context/DataContext";
 import "../Dashboard.css";
 
@@ -18,13 +17,9 @@ const emptyItem = {
 };
 
 function RestaurantDashboard() {
-  const { user } = useAuth();
-  const { restaurants, addMenuItem, removeMenuItem } = useData();
+  const { myRestaurant: restaurant, addMenuItem, removeMenuItem } = useData();
 
   const [form, setForm] = useState(emptyItem);
-
-  // the restaurant of the logged in admin
-  const restaurant = restaurants.find((r) => r.id === user.restaurantId);
 
   // accounts made before the codes were linked have no restaurant
   if (!restaurant) {
@@ -52,7 +47,7 @@ function RestaurantDashboard() {
   function handleAddItem(event) {
     event.preventDefault();
 
-    addMenuItem(restaurant.id, {
+    addMenuItem({
       name: form.name.trim(),
       description: form.description.trim(),
       price: Number(form.price) || 0,
@@ -70,7 +65,7 @@ function RestaurantDashboard() {
   // delete an item after confirmation
   function handleRemoveItem(item) {
     if (window.confirm(`Biztosan törlöd: ${item.name}?`)) {
-      removeMenuItem(restaurant.id, item.id);
+      removeMenuItem(item.id);
     }
   }
 

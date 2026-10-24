@@ -1,11 +1,14 @@
 import { useState } from "react";
 import { Star, Clock, ArrowRight } from "lucide-react";
 import RestaurantCard from "../components/RestaurantCard";
-import { categories, restaurants } from "../data/restaurants";
+import { categories } from "../data/restaurants";
+import { useData } from "../context/DataContext";
 import "./HomePage.css";
 
-
 function HomePage({ search, onSearchChange }) {
+  // restaurants come from the api through the data context
+  const { publicRestaurants: restaurants, loading, error } = useData();
+
   // store the selected category
   const [category, setCategory] = useState("Mindegyik");
 
@@ -129,7 +132,11 @@ function HomePage({ search, onSearchChange }) {
           </span>
         </div>
 
-        {filteredRestaurants.length > 0 ? (
+        {/* loading and error states of the api call */}
+        {loading && <p className="results-count">Betöltés...</p>}
+        {error && <p className="results-count">{error}</p>}
+
+        {loading || error ? null : filteredRestaurants.length > 0 ? (
           <div className="restaurant-grid">
             {filteredRestaurants.map((restaurant) => (
               <RestaurantCard

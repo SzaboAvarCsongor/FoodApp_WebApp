@@ -1,15 +1,48 @@
+import { useState, useEffect } from "react";
 import { Link, useParams } from "react-router-dom";
 import { ArrowLeft, Clock, Star, Plus, Minus } from "lucide-react";
-import { restaurants } from "../data/restaurants";
+import { fetchRestaurant } from "../services/api";
+import { categories } from "../data/restaurants";
 import "./RestaurantPage.css";
 
 function RestaurantPage({ cart, onAdd, onRemove }) {
   // the id comes from the url: /restaurant/:id
   const { id } = useParams();
-  const restaurant = restaurants.find((item) => item.id === Number(id));
 
-  // unknown restaurant id
-  if (!restaurant) {
+  const [restaurant, setRestaurant] = useState(null);
+  const [status, setStatus] = useState("loading"); // loading, ok, error
+
+  // load the restaurant with its menu from the api
+  useEffect(() => {
+    async function load() {
+      setStatus("loading");
+      try {
+        const data = await fetchRestaurant(id);
+        setRestaurant({
+          ...data,
+          // emoji and color are not in the database, take them from the category
+          emoji: categories.find((c) => c.name === data.category)?.emoji || "🍽️",
+          color: "#fff0e4",
+        });
+        setStatus("ok");
+      } catch {
+        setStatus("error");
+      }
+    }
+
+    load();
+  }, [id]);
+
+  if (status === "loading") {
+    return (
+      <main className="page-placeholder">
+        <p>Betöltés...</p>
+      </main>
+    );
+  }
+
+  // unknown restaurant id or api error
+  if (status === "error" || !restaurant) {
     return (
       <main className="page-placeholder">
         <h1>Nem találjuk az éttermet</h1>
@@ -59,11 +92,13 @@ function RestaurantPage({ cart, onAdd, onRemove }) {
         style={{ backgroundColor: restaurant.color }}
       >
         <span className="banner-emoji">{restaurant.emoji}</span>
-        <img
-          src={restaurant.image}
-          alt={restaurant.name}
-          onError={(event) => (event.currentTarget.style.display = "none")}
-        />
+        {restaurant.image && (
+          <img
+            src={restaurant.image}
+            alt={restaurant.name}
+            onError={(event) => (event.currentTarget.style.display = "none")}
+          />
+        )}
       </section>
 
       <div className="restaurant-details">
@@ -86,6 +121,12 @@ function RestaurantPage({ cart, onAdd, onRemove }) {
       </div>
 
       {/* menu grouped by category */}
+      {restaurant.menu.length === 0 && (
+        <p className="panel-empty" style={{ marginTop: 32 }}>
+          Ennek az étteremnek még nincs étlapja.
+        </p>
+      )}
+
       {Object.entries(groups).map(([groupName, items]) => (
         <section className="menu-group" key={groupName}>
           <h2>{groupName}</h2>

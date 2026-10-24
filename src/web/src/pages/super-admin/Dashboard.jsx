@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   BarChart3,
   Store,
@@ -12,6 +12,7 @@ import {
 import { useAuth } from "../../context/AuthContext";
 import { useData } from "../../context/DataContext";
 import { categories } from "../../data/restaurants";
+import { fetchUsers, deleteUser } from "../../services/api";
 import "../Dashboard.css";
 
 // readable role names
@@ -23,15 +24,20 @@ const roleLabels = {
 };
 
 function SuperAdminDashboard() {
-  const { user, listUsers, removeUser } = useAuth();
-  const { restaurants, addRestaurant, removeRestaurant, toggleActive } =
+  const { user } = useAuth();
+  const { adminRestaurants: restaurants, addRestaurant, removeRestaurant, toggleActive } =
     useData();
 
   // which tab is open: "stats", "restaurants" or "users"
   const [tab, setTab] = useState("stats");
 
-  // users are read from storage, so keep them in state and refresh after changes
-  const [users, setUsers] = useState(listUsers);
+  // users come from the database
+  const [users, setUsers] = useState([]);
+  useEffect(() => {
+    fetchUsers()
+      .then(setUsers)
+      .catch(() => setUsers([]));
+  }, []);
 
   // form to add a new restaurant
   const [form, setForm] = useState({
@@ -52,23 +58,21 @@ function SuperAdminDashboard() {
   }
 
   // create the restaurant and show its code
-  function handleAddRestaurant(event) {
+  async function handleAddRestaurant(event) {
     event.preventDefault();
-
-    const emoji =
-      categories.find((item) => item.name === form.category)?.emoji || "🍽️";
-
-    const created = addRestaurant({
-      name: form.name.trim(),
-      category: form.category,
-      emoji,
-      fee: Number(form.fee) || 0,
-      time: form.time.trim(),
-      image: form.image.trim(),
-    });
-
-    setCreatedRestaurant(created);
-    setForm((current) => ({ ...current, name: "", image: "" }));
+    try {
+      const created = await addRestaurant({
+        name: form.name.trim(),
+        category: form.category,
+        fee: Number(form.fee) || 0,
+        time: form.time.trim(),
+        image: form.image.trim(),
+      });
+      setCreatedRestaurant(created);
+      setForm((current) => ({ ...current, name: "", image: "" }));
+    } catch (err) {
+      alert(err.message);
+    }
   }
 
   // delete a restaurant after confirmation
@@ -79,10 +83,13 @@ function SuperAdminDashboard() {
   }
 
   // delete a user after confirmation
-  function handleRemoveUser(target) {
-    if (window.confirm(`Biztosan törlöd: ${target.fullName}?`)) {
-      removeUser(target.id);
-      setUsers(listUsers());
+  async function handleRemoveUser(target) {
+    if (!window.confirm(`Biztosan törlöd: ${target.fullName}?`)) return;
+    try {
+      await deleteUser(target.id);
+      setUsers(await fetchUsers());
+    } catch (err) {
+      alert(err.message);
     }
   }
 

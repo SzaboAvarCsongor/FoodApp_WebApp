@@ -13,6 +13,7 @@ function AuthModal({ onClose }) {
 
   // error message shown above the submit button
   const [error, setError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
   // values typed into the form
   const [authForm, setAuthForm] = useState({
@@ -48,31 +49,35 @@ function AuthModal({ onClose }) {
   }
 
   // submit the form
-  function handleAuthSubmit(event) {
-    event.preventDefault();
-    setError("");
+  // submit the form (login and register are async now)
+async function handleAuthSubmit(event) {
+  event.preventDefault();
+  setError("");
+  setSubmitting(true);
 
-    const result =
-      authMode === "login"
-        ? login(authForm)
-        : register({
-            ...authForm,
-            restaurantCode: authForm.restaurantCode.trim().toUpperCase(),
-          });
+  const result =
+    authMode === "login"
+      ? await login(authForm)
+      : await register({
+          ...authForm,
+          restaurantCode: authForm.restaurantCode.trim().toUpperCase(),
+        });
 
-    if (!result.ok) {
-      setError(result.error);
-      return;
-    }
+  setSubmitting(false);
 
-    onClose();
-
-    // admins go to their dashboard, customers stay where they are (for example the cart)
-    const path = homePathForRole(result.user.role);
-    if (path !== "/") {
-      navigate(path);
-    }
+  if (!result.ok) {
+    setError(result.error);
+    return;
   }
+
+  onClose();
+
+  // admins go to their dashboard, customers stay where they are (for example the cart)
+  const path = homePathForRole(result.user.role);
+  if (path !== "/") {
+    navigate(path);
+  }
+}
 
   // the code box is only needed when registering as a restaurant admin
   const showRestaurantCode =
@@ -173,8 +178,12 @@ function AuthModal({ onClose }) {
 
           {error && <p className="auth-error">{error}</p>}
 
-          <button className="primary-button auth-submit" type="submit">
-            {authMode === "login" ? "Belépés" : "Fiók létrehozása"}
+          <button className="primary-button auth-submit" type="submit" disabled={submitting}>
+                {submitting
+                    ? "Egy pillanat..."
+                    : authMode === "login"
+                    ? "Belépés"
+                    : "Fiók létrehozása"}
           </button>
         </form>
 

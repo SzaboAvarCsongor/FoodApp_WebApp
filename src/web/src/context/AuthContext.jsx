@@ -1,31 +1,8 @@
-import { createContext, useContext, useState } from "react";
-import { useData } from "./DataContext";
+import { createContext, useContext, useState, useEffect } from "react";
+import { supabase } from "../services/supabase";
+import { fetchMe, registerAccount } from "../services/api";
 
 const AuthContext = createContext(null);
-
-const USERS_KEY = "foodapp_users";
-const SESSION_KEY = "foodapp_session";
-
-// temporary: super admin exists from the start, it cannot register
-const seedUsers = [
-  {
-    id: "u-super",
-    fullName: "Szuper Admin",
-    email: "super@foodapp.com",
-    password: "123456",
-    role: "SUPER_ADMIN",
-  },
-];
-
-// read json from localstorage without crashing on bad data
-function readJson(key, fallback) {
-  try {
-    const raw = localStorage.getItem(key);
-    return raw ? JSON.parse(raw) : fallback;
-  } catch {
-    return fallback;
-  }
-}
 
 // where each role lands after login
 // eslint-disable-next-line react-refresh/only-export-components
@@ -36,115 +13,67 @@ export function homePathForRole(role) {
 }
 
 export function AuthProvider({ children }) {
-  const { findByCode, setOwner } = useData();
+  const [user, setUser] = useState(null);
 
-  // the logged in user, restored from the saved session
-  const [user, setUser] = useState(() => readJson(SESSION_KEY, null));
+  // true while the saved login is being restored
+  const [loading, setLoading] = useState(true);
 
-  function getUsers() {
-    return [...seedUsers, ...readJson(USERS_KEY, [])];
-  }
+  // restore the login after a page refresh
+  useEffect(() => {
+    async function restore() {
+      const { data } = await supabase.auth.getSession();
 
-  // start a session without keeping the password in it
-  function startSession(account) {
-    const { password, ...safeUser } = account;
-    localStorage.setItem(SESSION_KEY, JSON.stringify(safeUser));
-    setUser(safeUser);
-    return safeUser;
-  }
+      if (data.session) {
+        try {
+          setUser(await fetchMe());
+        } catch {
+          await supabase.auth.signOut();
+        }
+      }
 
-  // todo: replace with fetch to /api/auth/register
-  function register({ fullName, email, password, accountType, restaurantCode }) {
-    const cleanEmail = email.trim().toLowerCase();
-
-    if (getUsers().some((u) => u.email === cleanEmail)) {
-      return { ok: false, error: "Ez az e-mail már foglalt." };
+      setLoading(false);
     }
 
-    // only these roles can be requested, super admin never
-    const allowed = ["CUSTOMER", "RESTAURANT_ADMIN"];
-    const role = allowed.includes(accountType) ? accountType : "CUSTOMER";
+    restore();
+  }, []);
 
-    // a restaurant admin needs a valid code that nobody used yet
-    let restaurant = null;
-    if (role === "RESTAURANT_ADMIN") {
-      restaurant = findByCode(restaurantCode);
-
-      if (!restaurant) {
-        return { ok: false, error: "Érvénytelen étterem kód." };
-      }
-      if (restaurant.ownerId) {
-        return { ok: false, error: "Ezt a kódot már felhasználták." };
-      }
-    }
-
-    const account = {
-      id: `u-${Date.now()}`,
-      fullName,
-      email: cleanEmail,
+  // login with supabase auth, then load the profile with the role
+  async function login({ email, password }) {
+    const { error } = await supabase.auth.signInWithPassword({
+      email: email.trim().toLowerCase(),
       password,
-      role,
-      restaurantId: restaurant ? restaurant.id : null,
-    };
+    });
 
-    localStorage.setItem(
-      USERS_KEY,
-      JSON.stringify([...readJson(USERS_KEY, []), account])
-    );
+    if (error) return { ok: false, error: "Hibás e-mail vagy jelszó." };
 
-    // the code is used up from now on
-    if (restaurant) {
-      setOwner(restaurant.id, account.id);
+    try {
+      const profile = await fetchMe();
+      setUser(profile);
+      return { ok: true, user: profile };
+    } catch (err) {
+      await supabase.auth.signOut();
+      return { ok: false, error: err.message };
+    }
+  }
+
+  // register on the backend (it decides the role), then log in
+  async function register({ fullName, email, password, accountType, restaurantCode }) {
+    try {
+      await registerAccount({ fullName, email, password, accountType, restaurantCode });
+    } catch (err) {
+      return { ok: false, error: err.message };
     }
 
-    return { ok: true, user: startSession(account) };
+    return login({ email, password });
   }
 
-  // todo: replace with fetch to /api/auth/login
-  function login({ email, password }) {
-    const cleanEmail = email.trim().toLowerCase();
-    const account = getUsers().find(
-      (u) => u.email === cleanEmail && u.password === password
-    );
-
-    if (!account) return { ok: false, error: "Hibás e-mail vagy jelszó." };
-
-    return { ok: true, user: startSession(account) };
-  }
-
-  function logout() {
-    localStorage.removeItem(SESSION_KEY);
+  async function logout() {
+    await supabase.auth.signOut();
     setUser(null);
   }
 
-  // all users without passwords, for the super admin list
-  function listUsers() {
-    return getUsers().map((account) => {
-      const { password, ...safeUser } = account;
-      return safeUser;
-    });
-  }
-
-  // delete a user, the super admin cannot be deleted
-  function removeUser(id) {
-    const target = getUsers().find((u) => u.id === id);
-    if (!target || target.role === "SUPER_ADMIN") return;
-
-    localStorage.setItem(
-      USERS_KEY,
-      JSON.stringify(readJson(USERS_KEY, []).filter((u) => u.id !== id))
-    );
-
-    // free the restaurant code again
-    if (target.restaurantId) {
-      setOwner(target.restaurantId, null);
-    }
-  }
-
   return (
-    <AuthContext.Provider
-      value={{ user, register, login, logout, listUsers, removeUser }}
-    >
+    <AuthContext.Provider value={{ user, loading, register, login, logout }}>
       {children}
     </AuthContext.Provider>
   );

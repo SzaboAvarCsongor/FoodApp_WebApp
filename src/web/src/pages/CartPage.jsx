@@ -2,15 +2,17 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Plus, Minus, Trash2, LogIn, ArrowLeft } from "lucide-react";
 import { useData } from "../context/DataContext";
+import { createOrder } from "../services/api";
 import "./CartPage.css";
 
 // user is null when nobody is logged in, it comes from AuthContext via App.jsx
 function CartPage({ cart, onAdd, onRemove, onClear, onAuthClick, user = null }) {
-  const { restaurants, placeOrder } = useData();
+  const { restaurants } = useData();
   const navigate = useNavigate();
 
-  // delivery address typed by the customer
+// delivery address typed by the customer
   const [address, setAddress] = useState("");
+  const [error, setError] = useState("");
 
   // empty cart
   if (cart.length === 0) {
@@ -45,20 +47,25 @@ function CartPage({ cart, onAdd, onRemove, onClear, onAuthClick, user = null }) 
   );
 
   // save the order, empty the cart and open the order history
-  function handleOrder(event) {
-    event.preventDefault();
+  // save the order in the database, empty the cart and open the order history
+async function handleOrder(event) {
+  event.preventDefault();
+  setError("");
 
-    placeOrder({
-      customer: user,
-      restaurant,
+  try {
+    await createOrder({
+      restaurantId: restaurant.id,
+      address: address.trim(),
       items: cart,
       deliveryFee,
-      address: address.trim(),
     });
 
     onClear();
     navigate("/orders");
+  } catch (err) {
+    setError(err.message);
   }
+}
 
   return (
     <main className="cart-page">
@@ -167,6 +174,7 @@ function CartPage({ cart, onAdd, onRemove, onClear, onAuthClick, user = null }) 
                 required
               />
             </label>
+            {error && <p className="auth-error">{error}</p>}
             <button className="primary-button order-button" type="submit">
               Rendelés leadása · {totals.price + deliveryFee} lej
             </button>
