@@ -177,7 +177,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 32,
     fontWeight: 'bold',
-    color: 'orange',
+    color: '#FF5722',
     marginBottom: 8,
   },
   subtitle: {
@@ -250,8 +250,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#ffffff',
   },
   roleBtnActive: {
-    backgroundColor: 'orange',
-    borderColor: 'orange',
+    backgroundColor: '#FF5722',
+    borderColor: '#FF5722',
   },
   roleText: {
     fontSize: 13,
@@ -262,12 +262,12 @@ const styles = StyleSheet.create({
     color: '#ffffff',
   },
   submitButton: {
-    backgroundColor: 'orange',
+    backgroundColor: '#FF5722',
     paddingVertical: 16,
     borderRadius: 12,
     alignItems: 'center',
     marginTop: 10,
-    shadowColor: 'orange',
+    shadowColor: '#FF5722',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 6,
