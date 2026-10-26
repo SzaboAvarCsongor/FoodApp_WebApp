@@ -1,0 +1,92 @@
+#root {
+  min-height: 100vh;
+}
+
+/* page container */
+.app {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 0 24px;
+}
+
+/* every page fills the free space between the navbar and the footer */
+.app > main {
+  flex: 1;
+}
+
+/* ---------- shared: logo (navbar and footer) ---------- */
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 1.4rem;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+}
+
+.brand-icon {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: var(--primary);
+  color: #fff;
+}
+
+.brand-accent {
+  color: var(--primary);
+}
+
+/* ---------- shared: small orange label above headings ---------- */
+.eyebrow {
+  display: inline-block;
+  margin-bottom: 10px;
+  color: var(--primary);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+}
+
+/* ---------- shared: main action button ---------- */
+.primary-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 26px;
+  border: none;
+  border-radius: 999px;
+  background: var(--primary);
+  color: #fff;
+  font-weight: 700;
+  box-shadow: 0 8px 20px rgba(232, 89, 12, 0.3);
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+
+.primary-button:hover {
+  background: var(--primary-dark);
+  transform: translateY(-2px);
+}
+
+@media (max-width: 600px) {
+  .app {
+    padding: 0 16px;
+  }
+}
+
+.page-placeholder {
+  padding: 56px 0;
+}
+
+.page-placeholder h1 {
+  margin-bottom: 12px;
+  font-size: 2.2rem;
+  font-weight: 800;
+}
+
+.page-placeholder p {
+  color: var(--muted);
+}

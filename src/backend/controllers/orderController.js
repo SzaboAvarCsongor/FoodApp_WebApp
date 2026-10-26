@@ -1,17 +1,19 @@
 import { supabase } from '../supabaseClient.js';
 
 export const createOrder = async (req, res) => {
-  const { 
-    customer_id, 
-    restaurant_id, 
-    delivery_address, 
-    total_price, 
-    total_calories, 
-    items 
+  const {
+    restaurant_id,
+    delivery_address,
+    delivery_fee,
+    total_price,
+    total_calories,
+    items,
   } = req.body;
 
-  if (!customer_id || !restaurant_id || !delivery_address || !items || items.length === 0) {
-    return res.status(400).json({ error: 'Hiányzó adatok a rendelés leadásához (customer_id, restaurant_id, delivery_address, items)!' });
+  if (!restaurant_id || !delivery_address || !items || items.length === 0) {
+    return res.status(400).json({
+      error: 'Hiányzó adatok a rendelés leadásához (restaurant_id, delivery_address, items)!',
+    });
   }
 
   try {
@@ -19,9 +21,10 @@ export const createOrder = async (req, res) => {
       .from('orders')
       .insert([
         {
-          customer_id,
+          customer_id: req.user.id,
           restaurant_id,
           delivery_address,
+          delivery_fee: delivery_fee || 0,
           total_price,
           total_calories: total_calories || null,
           status: 'PENDING',
@@ -32,13 +35,11 @@ export const createOrder = async (req, res) => {
 
     if (orderError) throw orderError;
 
-    const orderId = orderData.id;
-
     const orderItemsToInsert = items.map((item) => ({
-      order_id: orderId,
+      order_id: orderData.id,
       menu_item_id: item.menu_item_id,
       quantity: item.quantity,
-      price: item.price,
+      price_at_time: item.price,
     }));
 
     const { error: itemsError } = await supabase
@@ -60,11 +61,16 @@ export const createOrder = async (req, res) => {
 export const getUserOrders = async (req, res) => {
   const { userId } = req.params;
 
+  // customers can only read their own orders
+  if (userId !== req.user.id && req.user.role !== 'SUPER_ADMIN') {
+    return res.status(403).json({ error: 'Nincs jogosultságod.' });
+  }
+
   try {
     const { data, error } = await supabase
       .from('orders')
-      .select('*, order_items(*, menu_items(name))')
-      .eq('customer_id', userId) 
+      .select('*, restaurants(name, category), order_items(*, menu_items(*))')
+      .eq('customer_id', userId)
       .order('created_at', { ascending: false });
 
     if (error) throw error;
