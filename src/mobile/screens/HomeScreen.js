@@ -73,7 +73,6 @@ export default function HomeScreen({ onNavigateToAuth }) {
     setFavorites((prev) => ({ ...prev, [id]: !prev[id] }));
   };
 
-  // Szűrés kategória és keresés alapján
   const filteredRestaurants = RESTAURANTS.filter((r) => {
     const matchesCategory =
       selectedCategory === 'all' || r.category === selectedCategory;
@@ -85,7 +84,6 @@ export default function HomeScreen({ onNavigateToAuth }) {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* 1. Fejléc: Cím, Kosár és Profil */}
       <View style={styles.topHeader}>
         <View style={styles.addressContainer}>
           <Text style={styles.addressLabel}>Kiszállítás ide:</Text>
@@ -110,7 +108,6 @@ export default function HomeScreen({ onNavigateToAuth }) {
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false}>
-        {/* 2. Keresősáv */}
         <View style={styles.searchContainer}>
           <Text style={styles.searchIcon}>🔍</Text>
           <TextInput
@@ -121,7 +118,6 @@ export default function HomeScreen({ onNavigateToAuth }) {
           />
         </View>
 
-        {/* 3. Hero Banner */}
         <View style={styles.heroBanner}>
           <View style={styles.heroContent}>
             <Text style={styles.heroTag}>JÓ ÉTVÁGYAT! 🍕</Text>
@@ -136,7 +132,6 @@ export default function HomeScreen({ onNavigateToAuth }) {
           </View>
         </View>
 
-        {/* 4. Kategóriák (Vízszintes görgető) */}
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionSubTitle}>MIT KÍVÁNSZ?</Text>
           <Text style={styles.sectionTitle}>Válassz kategóriát</Text>
@@ -164,7 +159,6 @@ export default function HomeScreen({ onNavigateToAuth }) {
           })}
         </ScrollView>
 
-        {/* 5. Népszerű éttermek */}
         <View style={styles.sectionHeaderBetween}>
           <View>
             <Text style={styles.sectionSubTitle}>VÁLOGATOTT NEKED</Text>
@@ -176,11 +170,9 @@ export default function HomeScreen({ onNavigateToAuth }) {
         <View style={styles.restaurantsGrid}>
           {filteredRestaurants.map((item) => (
             <TouchableOpacity key={item.id} style={styles.card} activeOpacity={0.9}>
-              {/* Kép + Jelvények */}
               <View style={styles.cardImageContainer}>
                 <Image source={{ uri: item.image }} style={styles.cardImage} />
                 
-                {/* Kedvenc gomb */}
                 <TouchableOpacity
                   style={styles.favoriteBtn}
                   onPress={() => toggleFavorite(item.id)}
@@ -190,13 +182,11 @@ export default function HomeScreen({ onNavigateToAuth }) {
                   </Text>
                 </TouchableOpacity>
 
-                {/* Idő jelvény */}
                 <View style={styles.timeBadge}>
                   <Text style={styles.timeBadgeText}>⏱ {item.deliveryTime}</Text>
                 </View>
               </View>
 
-              {/* Értékelés & Cím */}
               <View style={styles.cardInfo}>
                 <View style={styles.cardTitleRow}>
                   <Text style={styles.cardTitle} numberOfLines={1}>
@@ -215,7 +205,6 @@ export default function HomeScreen({ onNavigateToAuth }) {
           ))}
         </View>
 
-        {/* Lábléc */}
         <View style={styles.footer}>
           <Text style={styles.footerLogo}>🍕 foodapp</Text>
           <Text style={styles.footerCopyright}>© 2026 FoodApp</Text>
