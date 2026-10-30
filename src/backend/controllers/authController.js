@@ -1,11 +1,81 @@
-import { supabase } from '../supabaseClient.js';
+import { supabase, supabaseAuth } from '../supabaseClient.js';
+
+export const login = async (req, res) => {
+  const email = typeof req.body.email === 'string' ? req.body.email.trim().toLowerCase() : '';
+  const { password } = req.body;
+
+  if (!email || typeof password !== 'string' || !password) {
+    return res.status(400).json({ error: 'Add meg az e-mail címedet és a jelszavadat.' });
+  }
+
+  const { data, error } = await supabaseAuth.auth.signInWithPassword({ email, password });
+  if (error?.code === 'invalid_credentials') {
+    return res.status(401).json({ error: 'Hibás e-mail cím vagy jelszó.' });
+  }
+  if (error) {
+    console.error('Supabase bejelentkezési hiba:', error.message);
+    return res.status(502).json({ error: 'A bejelentkezési szolgáltatás nem érhető el.' });
+  }
+  if (!data.session) {
+    console.error('Supabase bejelentkezés nem adott vissza munkamenetet.');
+    return res.status(502).json({ error: 'A bejelentkezési szolgáltatás nem adott vissza munkamenetet.' });
+  }
+
+  const { data: profile, error: profileError } = await supabase
+    .from('profiles')
+    .select('id, full_name, email, role')
+    .eq('id', data.user.id)
+    .maybeSingle();
+
+  if (profileError) {
+    return res.status(500).json({ error: 'Nem sikerült betölteni a felhasználói profilt.' });
+  }
+  if (!profile) {
+    return res.status(403).json({ error: 'A fiókhoz nem tartozik felhasználói profil.' });
+  }
+
+  let restaurantId = null;
+  if (profile.role === 'RESTAURANT_ADMIN') {
+    const { data: restaurant, error: restaurantError } = await supabase
+      .from('restaurants')
+      .select('id')
+      .eq('owner_id', profile.id)
+      .maybeSingle();
+
+    if (restaurantError) {
+      return res.status(500).json({ error: 'Nem sikerült betölteni az étterem adatait.' });
+    }
+    restaurantId = restaurant?.id ?? null;
+  }
+
+  res.json({
+    token: data.session.access_token,
+    user: {
+      id: profile.id,
+      fullName: profile.full_name,
+      email: profile.email,
+      role: profile.role,
+      restaurantId,
+    },
+  });
+};
 
 // register: the role is decided here, the browser only asks for a type
 export const register = async (req, res) => {
   const { fullName, email, password, accountType, restaurantCode } = req.body;
 
-  if (!fullName || !email || !password || password.length < 6) {
+  if (
+    typeof fullName !== 'string' ||
+    !fullName.trim() ||
+    typeof email !== 'string' ||
+    !email.trim() ||
+    typeof password !== 'string' ||
+    password.length < 6
+  ) {
     return res.status(400).json({ error: 'Hiányzó vagy hibás adatok.' });
+  }
+  if (accountType && !['CUSTOMER', 'RESTAURANT_ADMIN'].includes(accountType)) {
+    return res.status(400).json({ error: 'Érvénytelen fióktípus.' });
   }
 
   // super admin and courier can never be requested here
