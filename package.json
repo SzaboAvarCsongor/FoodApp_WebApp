@@ -34,8 +34,8 @@
   "scripts": {
     "start:backend": "npm run dev --prefix src/backend",
     "start:mobile": "npm run start --prefix src/mobile",
-    "start:web": "npm run web --prefix src/mobile",
-    "dev": "concurrently --raw \"npm run start:backend\" \"npm run start:mobile\""
+    "start:web": "npm run dev --prefix src/web",
+    "dev": "concurrently --raw --kill-others \"npm run start:backend\" \"npm run start:mobile\" \"npm run start:web\""
     
   },
   "repository": {

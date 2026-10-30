@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   StyleSheet,
   Text,
@@ -8,79 +8,103 @@ import {
   SafeAreaView,
   ScrollView,
   Image,
-  FlatList,
+  ActivityIndicator,
 } from 'react-native';
+import { fetchWithAuth } from '../services/api';
 
-// Mock adatok a képről
-const CATEGORIES = [
+const DEFAULT_CATEGORIES = [
   { id: 'all', name: 'Mindegyik', icon: '🍽️' },
-  { id: 'pizza', name: 'Pizza', icon: '🍕' },
-  { id: 'burger', name: 'Burgerek', icon: '🍔' },
-  { id: 'asian', name: 'Ázsiai', icon: '🍣' },
-  { id: 'salad', name: 'Saláták', icon: '🥗' },
-  { id: 'dessert', name: 'Desszertek', icon: '🍰' },
+  { id: 'Pizza', name: 'Pizza', icon: '🍕' },
+  { id: 'Burgerek', name: 'Burgerek', icon: '🍔' },
+  { id: 'Ázsiai', name: 'Ázsiai', icon: '🍣' },
+  { id: 'Saláták', name: 'Saláták', icon: '🥗' },
+  { id: 'Desszertek', name: 'Desszertek', icon: '🍰' },
 ];
 
-const RESTAURANTS = [
-  {
-    id: '1',
-    name: 'Napoli Pizza',
-    category: 'pizza',
-    categoryName: 'Pizza',
-    rating: 4.8,
-    deliveryTime: '20-30 perc',
-    deliveryFee: '5 lej',
-    image: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=600&q=80',
-  },
-  {
-    id: '2',
-    name: 'Burger House',
-    category: 'burger',
-    categoryName: 'Burgerek',
-    rating: 4.7,
-    deliveryTime: '25-35 perc',
-    deliveryFee: '4 lej',
-    image: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=600&q=80',
-  },
-  {
-    id: '3',
-    name: 'Sushi Garden',
-    category: 'asian',
-    categoryName: 'Ázsiai',
-    rating: 4.9,
-    deliveryTime: '30-40 perc',
-    deliveryFee: '6 lej',
-    image: 'https://images.unsplash.com/photo-1579871494447-9811cf80d66c?auto=format&fit=crop&w=600&q=80',
-  },
-  {
-    id: '4',
-    name: 'Green Bowl',
-    category: 'salad',
-    categoryName: 'Saláták',
-    rating: 4.6,
-    deliveryTime: '15-25 perc',
-    deliveryFee: '3 lej',
-    image: 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?auto=format&fit=crop&w=600&q=80',
-  },
-];
+function getCategoryIcon(category) {
+  const normalized = category.toLocaleLowerCase();
+  if (normalized.includes('pizza')) return '🍕';
+  if (normalized.includes('burger')) return '🍔';
+  if (normalized.includes('ázsiai') || normalized.includes('asian') || normalized.includes('sushi')) return '🍣';
+  if (normalized.includes('saláta') || normalized.includes('salad')) return '🥗';
+  if (normalized.includes('desszert') || normalized.includes('dessert')) return '🍰';
+  return '🍽️';
+}
 
 export default function HomeScreen({ onNavigateToAuth }) {
+  const [restaurants, setRestaurants] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
+  const [reloadKey, setReloadKey] = useState(0);
+
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [favorites, setFavorites] = useState({});
+
+  useEffect(() => {
+    let active = true;
+
+    fetchWithAuth('/restaurants')
+      .then((data) => {
+        if (!Array.isArray(data)) {
+          throw new Error('A szerver étteremlistája érvénytelen.');
+        }
+        if (active) setRestaurants(data);
+      })
+      .catch((error) => {
+        if (!active) return;
+        console.error('Éttermek betöltési hiba:', error);
+        setRestaurants([]);
+        setLoadError(error.message || 'Nem sikerült betölteni az éttermeket.');
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [reloadKey]);
+
+  const availableCategories = restaurants
+    .map((restaurant) => restaurant.category)
+    .filter((category) => typeof category === 'string' && category.trim())
+    .filter((category, index, list) => list.findIndex(
+      (item) => item.toLocaleLowerCase() === category.toLocaleLowerCase()
+    ) === index);
+  const categories = availableCategories.length
+    ? [
+      DEFAULT_CATEGORIES[0],
+      ...availableCategories.map((name) => ({
+        id: name,
+        name,
+        icon: getCategoryIcon(name),
+      })),
+    ]
+    : DEFAULT_CATEGORIES;
 
   const toggleFavorite = (id) => {
     setFavorites((prev) => ({ ...prev, [id]: !prev[id] }));
   };
 
-  const filteredRestaurants = RESTAURANTS.filter((r) => {
+  const filteredRestaurants = restaurants.filter((r) => {
     const matchesCategory =
-      selectedCategory === 'all' || r.category === selectedCategory;
-    const matchesSearch = r.name
-      .toLowerCase()
-      .includes(searchQuery.toLowerCase());
+      selectedCategory === 'all' ||
+      String(r.category || '').toLocaleLowerCase() === selectedCategory.toLocaleLowerCase();
+    const matchesSearch = String(r.name || '')
+      .toLocaleLowerCase()
+      .includes(searchQuery.trim().toLocaleLowerCase());
     return matchesCategory && matchesSearch;
   });
+
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#FF5722" />
+        <Text style={styles.loadingText}>Éttermek betöltése...</Text>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -142,7 +166,7 @@ export default function HomeScreen({ onNavigateToAuth }) {
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.categoriesList}
         >
-          {CATEGORIES.map((cat) => {
+          {categories.map((cat) => {
             const isActive = selectedCategory === cat.id;
             return (
               <TouchableOpacity
@@ -150,7 +174,7 @@ export default function HomeScreen({ onNavigateToAuth }) {
                 style={[styles.categoryChip, isActive && styles.categoryChipActive]}
                 onPress={() => setSelectedCategory(cat.id)}
               >
-                <Text style={styles.categoryIcon}>{cat.icon}</Text>
+                <Text style={styles.categoryIcon}>{cat.icon || '🍽️'}</Text>
                 <Text style={[styles.categoryText, isActive && styles.categoryTextActive]}>
                   {cat.name}
                 </Text>
@@ -171,7 +195,13 @@ export default function HomeScreen({ onNavigateToAuth }) {
           {filteredRestaurants.map((item) => (
             <TouchableOpacity key={item.id} style={styles.card} activeOpacity={0.9}>
               <View style={styles.cardImageContainer}>
-                <Image source={{ uri: item.image }} style={styles.cardImage} />
+                {item.image_url ? (
+                  <Image source={{ uri: item.image_url }} style={styles.cardImage} />
+                ) : (
+                  <View style={[styles.cardImage, styles.cardImagePlaceholder]}>
+                    <Text style={styles.cardImagePlaceholderIcon}>🍽️</Text>
+                  </View>
+                )}
                 
                 <TouchableOpacity
                   style={styles.favoriteBtn}
@@ -183,7 +213,11 @@ export default function HomeScreen({ onNavigateToAuth }) {
                 </TouchableOpacity>
 
                 <View style={styles.timeBadge}>
-                  <Text style={styles.timeBadgeText}>⏱ {item.deliveryTime}</Text>
+                  <Text style={styles.timeBadgeText}>
+                    ⏱ {item.delivery_time_min && item.delivery_time_max
+                      ? `${item.delivery_time_min}-${item.delivery_time_max} perc`
+                      : '20-30 perc'}
+                  </Text>
                 </View>
               </View>
 
@@ -194,16 +228,42 @@ export default function HomeScreen({ onNavigateToAuth }) {
                   </Text>
                   <View style={styles.ratingBox}>
                     <Text style={styles.ratingStar}>★</Text>
-                    <Text style={styles.ratingText}>{item.rating}</Text>
+                    <Text style={styles.ratingText}>
+                      {item.rating > 0 ? item.rating : 'Új'}
+                    </Text>
                   </View>
                 </View>
 
-                <Text style={styles.cardCategory}>{item.categoryName}</Text>
-                <Text style={styles.cardDelivery}>Szállítás: {item.deliveryFee}</Text>
+                <Text style={styles.cardCategory}>{item.category || 'Egyéb'}</Text>
+                <Text style={styles.cardDelivery}>
+                  Szállítás: {item.delivery_fee ? `${item.delivery_fee} lej` : 'Ingyenes'}
+                </Text>
               </View>
             </TouchableOpacity>
           ))}
         </View>
+
+        {loadError ? (
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyStateText}>{loadError}</Text>
+            <TouchableOpacity
+              style={styles.retryButton}
+              onPress={() => {
+                setLoadError('');
+                setLoading(true);
+                setReloadKey((key) => key + 1);
+              }}
+            >
+              <Text style={styles.retryButtonText}>Újrapróbálás</Text>
+            </TouchableOpacity>
+          </View>
+        ) : filteredRestaurants.length === 0 ? (
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyStateText}>
+              {restaurants.length ? 'Nincs találat a keresésre.' : 'Jelenleg nincs elérhető étterem.'}
+            </Text>
+          </View>
+        ) : null}
 
         <View style={styles.footer}>
           <Text style={styles.footerLogo}>🍕 foodapp</Text>
@@ -218,6 +278,18 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#FAF8F5',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#FAF8F5',
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 14,
+    color: '#666666',
+    fontWeight: '500',
   },
   topHeader: {
     flexDirection: 'row',
@@ -442,6 +514,14 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
   },
+  cardImagePlaceholder: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#FFF2EB',
+  },
+  cardImagePlaceholderIcon: {
+    fontSize: 44,
+  },
   favoriteBtn: {
     position: 'absolute',
     top: 10,
@@ -507,6 +587,27 @@ const styles = StyleSheet.create({
   cardDelivery: {
     fontSize: 12,
     color: '#999999',
+  },
+  emptyState: {
+    alignItems: 'center',
+    paddingHorizontal: 24,
+    paddingVertical: 28,
+  },
+  emptyStateText: {
+    color: '#666666',
+    fontSize: 14,
+    textAlign: 'center',
+  },
+  retryButton: {
+    marginTop: 12,
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    borderRadius: 10,
+    backgroundColor: '#FF5722',
+  },
+  retryButtonText: {
+    color: '#FFFFFF',
+    fontWeight: '600',
   },
   footer: {
     alignItems: 'center',

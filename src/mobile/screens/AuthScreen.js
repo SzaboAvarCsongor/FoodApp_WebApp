@@ -11,6 +11,8 @@ import {
   ScrollView,
   Alert
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { API_BASE_URL } from '../services/api';
 
 export default function AuthScreen() {
   const [isLogin, setIsLogin] = useState(true);
@@ -19,23 +21,72 @@ export default function AuthScreen() {
   const [fullName, setFullName] = useState('');
   const [role, setRole] = useState('customer'); 
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!email || !password) {
       Alert.alert('Hiba', 'Kérjük töltsd ki az e-mail és jelszó mezőket!');
       return;
     }
 
-    if (isLogin) {
-      Alert.alert('Sikeres bejelentkezés!', `Üdv újra, ${email}!`);
-    } else {
-      if (!fullName) {
-        Alert.alert('Hiba', 'Kérjük add meg a teljes neved!');
-        return;
+    if (!isLogin && !fullName) {
+      Alert.alert('Hiba', 'Kérjük add meg a teljes neved!');
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      if (isLogin) {
+        const response = await fetch(`${API_BASE_URL}/auth/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password }),
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+          await AsyncStorage.setItem('userToken', data.token);
+          if (data.user) {
+            await AsyncStorage.setItem('userData', JSON.stringify(data.user));
+          }
+
+          
+          if (onNavigateToHome) {
+            onNavigateToHome();
+          }
+        } else {
+          Alert.alert('Hiba', data.message || 'Sikertelen bejelentkezés!');
+        }
+      } else {
+      
+        const response = await fetch(`${API_BASE_URL}/auth/register`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: fullName,
+            email,
+            password,
+            role,
+          }),
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+          Alert.alert(
+            'Sikeres regisztráció!',
+            'Fiókod elkészült. Most már bejelentkezhetsz!'
+          );
+          setIsLogin(true); 
+        } else {
+          Alert.alert('Hiba', data.message || 'Sikertelen regisztráció!');
+        }
       }
-      Alert.alert(
-        'Sikeres regisztráció!',
-        `Név: ${fullName}\nEmail: ${email}\nSzerepkör: ${role}`
-      );
+    } catch (error) {
+      console.error('Auth hiba:', error);
+      Alert.alert('Hálózati hiba', 'Nem sikerült csatlakozni a szerverhez!');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -128,15 +179,6 @@ export default function AuthScreen() {
                   >
                     <Text style={[styles.roleText, role === 'courier' && styles.roleTextActive]}>
                       Futár
-                    </Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={[styles.roleBtn, role === 'restaurant_admin' && styles.roleBtnActive]}
-                    onPress={() => setRole('restaurant_admin')}
-                  >
-                    <Text style={[styles.roleText, role === 'restaurant_admin' && styles.roleTextActive]}>
-                      Étterem
                     </Text>
                   </TouchableOpacity>
                 </View>
