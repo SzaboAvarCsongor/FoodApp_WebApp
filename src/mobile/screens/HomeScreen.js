@@ -31,7 +31,8 @@ function getCategoryIcon(category) {
   return '🍽️';
 }
 
-export default function HomeScreen({ onNavigateToAuth }) {
+
+export default function HomeScreen({ onNavigateToAuth, onSelectRestaurant }) {
   const [restaurants, setRestaurants] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
@@ -193,7 +194,7 @@ export default function HomeScreen({ onNavigateToAuth }) {
 
         <View style={styles.restaurantsGrid}>
           {filteredRestaurants.map((item) => (
-            <TouchableOpacity key={item.id} style={styles.card} activeOpacity={0.9}>
+            <TouchableOpacity key={item.id} style={styles.card} activeOpacity={0.9} onPress={() => onSelectRestaurant?.(item.id)}>
               <View style={styles.cardImageContainer}>
                 {item.image_url ? (
                   <Image source={{ uri: item.image_url }} style={styles.cardImage} />
