@@ -1,19 +1,59 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { StyleSheet, View, Text, TouchableOpacity, Modal } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import HomeScreen from './screens/HomeScreen';
 import AuthScreen from './screens/AuthScreen';
 import RestaurantDetailScreen from './screens/RestaurantDetailScreen';
 import CartScreen from './screens/CartScreen';
 import OrdersScreen from './screens/OrdersScreen';
+import CourierScreen from './screens/CourierScreen';
+
+const isCourier = (user) =>
+  typeof user?.role === 'string' && user.role.toUpperCase() === 'COURIER';
 
 export default function App() {
-  const [currentScreen, setCurrentScreen] = useState('home');
+  const [currentScreen, setCurrentScreen] = useState('home'); // 'home' | 'auth' | 'restaurant' | 'cart' | 'orders' | 'courier'
   const [cartReturnScreen, setCartReturnScreen] = useState('home');
   const [selectedRestaurantId, setSelectedRestaurantId] = useState(null);
   const [cartItems, setCartItems] = useState([]);
   const [cartRestaurant, setCartRestaurant] = useState(null);
   const [pendingAdd, setPendingAdd] = useState(null);
+
+  // Indításkor ellenőrizzük, hogy futár van-e bejelentkezve
+  useEffect(() => {
+    const checkUserRole = async () => {
+      try {
+        const userDataStr = await AsyncStorage.getItem('userData');
+        if (userDataStr) {
+          const user = JSON.parse(userDataStr);
+          if (isCourier(user)) {
+            setCurrentScreen('courier');
+          }
+        }
+      } catch (e) {
+        console.log('Szerepkör ellenőrzési hiba:', e);
+      }
+    };
+    checkUserRole();
+  }, []);
+
+  // Bejelentkezés utáni átirányítás szerepkör alapján
+  const handleAuthSuccess = (user) => {
+    if (isCourier(user)) {
+      setCurrentScreen('courier');
+    } else {
+      setCurrentScreen('home');
+    }
+  };
+
+  // Kijelentkezés (futárnál és vásárlónál is használható)
+  const handleLogout = async () => {
+    await AsyncStorage.multiRemove(['userToken', 'userData']);
+    setCartItems([]);
+    setCartRestaurant(null);
+    setCurrentScreen('auth');
+  };
 
   const addToCart = (item, restaurant) => {
     setCartItems((prevItems) => {
@@ -88,6 +128,12 @@ export default function App() {
     <View style={styles.root}>
       <StatusBar style="auto" />
 
+      {/* Futár nézet */}
+      {currentScreen === 'courier' && (
+        <CourierScreen onLogout={handleLogout} />
+      )}
+
+      {/* Vásárlói Főoldal */}
       <View style={[styles.root, currentScreen !== 'home' && styles.hidden]}>
         <HomeScreen
           cartCount={cartCount}
@@ -101,10 +147,12 @@ export default function App() {
         />
       </View>
 
+      {/* Bejelentkezés / Regisztráció */}
       {currentScreen === 'auth' && (
-        <AuthScreen onNavigateToHome={() => setCurrentScreen('home')} />
+        <AuthScreen onNavigateToHome={handleAuthSuccess} />
       )}
 
+      {/* Étterem menü */}
       {currentScreen === 'restaurant' && (
         <RestaurantDetailScreen
           restaurantId={selectedRestaurantId}
@@ -115,6 +163,7 @@ export default function App() {
         />
       )}
 
+      {/* Kosár */}
       {currentScreen === 'cart' && (
         <CartScreen
           cartItems={cartItems}
@@ -128,6 +177,7 @@ export default function App() {
         />
       )}
 
+      {/* Vásárlói rendeléskövetés */}
       {currentScreen === 'orders' && (
         <OrdersScreen
           onBack={() => setCurrentScreen('home')}
@@ -138,6 +188,7 @@ export default function App() {
         />
       )}
 
+      {/* Kosár felülírása figyelmeztető ablak */}
       <Modal
         transparent
         animationType="fade"
