@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   StyleSheet,
   Text,
@@ -13,19 +13,52 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { fetchWithAuth } from '../services/api';
 
+const normalizeOrder = (order) => {
+  const restaurant = Array.isArray(order.restaurants)
+    ? order.restaurants[0]
+    : order.restaurants;
+  const customer = Array.isArray(order.profiles) ? order.profiles[0] : order.profiles;
+  const statuses = {
+    PENDING: 'pending',
+    ACCEPTED: 'accepted',
+    PREPARING: 'in_preparation',
+    READY: 'ready',
+    DELIVERING: 'on_the_way',
+    DELIVERED: 'delivered',
+  };
+
+  return {
+    id: order.id,
+    status: statuses[order.status] || String(order.status).toLowerCase(),
+    restaurantName: restaurant?.name || 'Étterem',
+    restaurantAddress: restaurant?.address || 'Cím nem érhető el',
+    customerName: customer?.full_name || 'Vásárló',
+    deliveryAddress: order.delivery_address || 'Cím nem érhető el',
+    deliveryFee: order.delivery_fee,
+    totalAmount: order.total_price,
+    items: (order.order_items || []).map((orderItem) => {
+      const menuItem = Array.isArray(orderItem.menu_items)
+        ? orderItem.menu_items[0]
+        : orderItem.menu_items;
+
+      return {
+        id: orderItem.id,
+        name: menuItem?.name || 'Törölt étel',
+        quantity: orderItem.quantity,
+      };
+    }),
+  };
+};
+
 export default function CourierScreen({ onLogout }) {
   const [orders, setOrders] = useState([]);
   const [courierName, setCourierName] = useState('Futár');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [updatingId, setUpdatingId] = useState(null);
+  const [errorMessage, setErrorMessage] = useState('');
 
-  useEffect(() => {
-    loadCourierProfile();
-    loadOrders();
-  }, []);
-
-  const loadCourierProfile = async () => {
+  const loadCourierProfile = useCallback(async () => {
     try {
       const userDataStr = await AsyncStorage.getItem('userData');
       if (userDataStr) {
@@ -36,62 +69,34 @@ export default function CourierScreen({ onLogout }) {
     } catch (e) {
       console.log('Profil betöltési hiba:', e);
     }
-  };
+  }, []);
 
-  const loadOrders = async () => {
+  const loadOrders = useCallback(async () => {
     try {
-      const data = await fetchWithAuth('/orders');
-      setOrders(Array.isArray(data) ? data : []);
+      const data = await fetchWithAuth('/orders/courier');
+      if (!Array.isArray(data)) {
+        throw new Error('A szerver érvénytelen rendeléslistát küldött.');
+      }
+      setOrders(data.map(normalizeOrder));
+      setErrorMessage('');
     } catch (error) {
-      console.log('Futár rendelések betöltési hiba, tartalék adatok használata:', error);
-      setOrders([
-        {
-          id: 'ord-201',
-          restaurantName: 'Szaftos Burger',
-          restaurantAddress: 'Fő utca 12.',
-          customerName: 'Kovács Anna',
-          deliveryAddress: 'Virág utca 8., 2. em. 4.',
-          status: 'on_the_way',
-          totalAmount: 4790,
-          deliveryFee: 790,
-          items: [
-            { name: 'Dupla Húsos Burger', quantity: 1 },
-            { name: 'Kézműves Cola', quantity: 1 },
-          ],
-        },
-        {
-          id: 'ord-202',
-          restaurantName: 'Napoli Pizza',
-          restaurantAddress: 'Kossuth tér 5.',
-          customerName: 'Nagy Péter',
-          deliveryAddress: 'Petőfi Sándor u. 44.',
-          status: 'in_preparation',
-          totalAmount: 3500,
-          deliveryFee: 600,
-          items: [
-            { name: 'Margherita Pizza', quantity: 1 },
-            { name: 'Sajtos Sültkrumpli', quantity: 1 },
-          ],
-        },
-        {
-          id: 'ord-203',
-          restaurantName: 'Sushi Garden',
-          restaurantAddress: 'Deák Ferenc u. 3.',
-          customerName: 'Szabó Eszter',
-          deliveryAddress: 'Rákóczi út 19.',
-          status: 'pending',
-          totalAmount: 6200,
-          deliveryFee: 850,
-          items: [
-            { name: 'Lazac Maki Box (16 db)', quantity: 1 },
-          ],
-        },
-      ]);
+      console.error('Futár rendelések betöltési hiba:', error);
+      setErrorMessage(error.message || 'Nem sikerült betölteni a rendeléseket.');
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    // Both helpers update state only after their asynchronous reads complete.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    loadCourierProfile();
+    loadOrders();
+    const refreshTimer = setInterval(loadOrders, 10000);
+
+    return () => clearInterval(refreshTimer);
+  }, [loadCourierProfile, loadOrders]);
 
   const onRefresh = () => {
     setRefreshing(true);
@@ -102,36 +107,39 @@ export default function CourierScreen({ onLogout }) {
     try {
       setUpdatingId(orderId);
 
-      await fetchWithAuth(`/orders/${orderId}/status`, {
-        method: 'PUT',
+      await fetchWithAuth(`/orders/${orderId}/courier-status`, {
+        method: 'PATCH',
         body: JSON.stringify({ status: newStatus }),
       });
 
       setOrders((prev) =>
-        prev.map((o) => (o.id === orderId ? { ...o, status: newStatus } : o))
+        prev.map((o) =>
+          o.id === orderId
+            ? { ...o, status: newStatus === 'DELIVERING' ? 'on_the_way' : 'delivered' }
+            : o
+        )
       );
+      setErrorMessage('');
 
       Alert.alert(
         'Siker! 🛵',
-        newStatus === 'on_the_way'
+        newStatus === 'DELIVERING'
           ? 'Felvetted a rendelést, indulhat a kiszállítás!'
           : 'A rendelést sikeresen kiszállítottad!'
       );
     } catch (error) {
-      console.log('Státusz frissítési hiba (helyi szimuláció fut):', error);
-      setOrders((prev) =>
-        prev.map((o) => (o.id === orderId ? { ...o, status: newStatus } : o))
-      );
+      console.error('Futár rendelési állapot frissítési hiba:', error);
+      setErrorMessage(error.message || 'Nem sikerült frissíteni a rendelés állapotát.');
     } finally {
       setUpdatingId(null);
     }
   };
 
   const activeDeliveries = orders.filter((o) => o.status === 'on_the_way');
-  const availableOrders = orders.filter(
-    (o) => o.status === 'pending' || o.status === 'in_preparation' || o.status === 'ready'
+  const restaurantOrders = orders.filter((o) =>
+    ['pending', 'accepted', 'in_preparation', 'ready'].includes(o.status)
   );
-  const completedToday = orders.filter((o) => o.status === 'delivered');
+  const completedOrders = orders.filter((o) => o.status === 'delivered');
 
   if (loading) {
     return (
@@ -162,6 +170,8 @@ export default function CourierScreen({ onLogout }) {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#FF5722']} />
         }
       >
+        {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
+
         <View style={styles.statsBanner}>
           <View style={styles.statBox}>
             <Text style={styles.statNumber}>{activeDeliveries.length}</Text>
@@ -169,12 +179,12 @@ export default function CourierScreen({ onLogout }) {
           </View>
           <View style={styles.statDivider} />
           <View style={styles.statBox}>
-            <Text style={styles.statNumber}>{availableOrders.length}</Text>
-            <Text style={styles.statLabel}>Elérhető</Text>
+            <Text style={styles.statNumber}>{restaurantOrders.length}</Text>
+            <Text style={styles.statLabel}>Éttermeknél</Text>
           </View>
           <View style={styles.statDivider} />
           <View style={styles.statBox}>
-            <Text style={styles.statNumber}>{completedToday.length}</Text>
+            <Text style={styles.statNumber}>{completedOrders.length}</Text>
             <Text style={styles.statLabel}>Teljesítve</Text>
           </View>
         </View>
@@ -193,7 +203,7 @@ export default function CourierScreen({ onLogout }) {
               <View key={order.id} style={styles.activeCard}>
                 <View style={styles.cardTopRow}>
                   <Text style={styles.statusPillActive}>🛵 Kiszállítás folyamatban</Text>
-                  <Text style={styles.feeText}>+{order.deliveryFee || 700} lej díj</Text>
+                  <Text style={styles.feeText}>+{order.deliveryFee ?? 0} lej díj</Text>
                 </View>
 
                 <Text style={styles.restaurantName}>{order.restaurantName}</Text>
@@ -222,7 +232,7 @@ export default function CourierScreen({ onLogout }) {
 
                   <TouchableOpacity
                     style={styles.deliverBtn}
-                    onPress={() => handleStatusChange(order.id, 'delivered')}
+                    onPress={() => handleStatusChange(order.id, 'DELIVERED')}
                     disabled={updatingId === order.id}
                   >
                     {updatingId === order.id ? (
@@ -238,22 +248,28 @@ export default function CourierScreen({ onLogout }) {
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Elérhető rendelések ({availableOrders.length})</Text>
+          <Text style={styles.sectionTitle}>Rendelések az éttermeknél ({restaurantOrders.length})</Text>
 
-          {availableOrders.length === 0 ? (
+          {restaurantOrders.length === 0 ? (
             <View style={styles.emptyBox}>
               <Text style={styles.emptyBoxText}>
-                Jelenleg nincs új felvehető rendelés. Húzd le a képernyőt a frissítéshez!
+                Jelenleg nincs rendelés az éttermeknél.
               </Text>
             </View>
           ) : (
-            availableOrders.map((order) => (
+            restaurantOrders.map((order) => (
               <View key={order.id} style={styles.availableCard}>
                 <View style={styles.cardTopRow}>
                   <Text style={styles.statusPillWait}>
-                    {order.status === 'in_preparation' ? '🍳 Készül az étteremben' : '⏳ Új rendelés'}
+                    {order.status === 'ready'
+                      ? '🍽️ Elkészült az étteremben'
+                      : order.status === 'in_preparation'
+                        ? '🍳 Készül az étteremben'
+                        : order.status === 'accepted'
+                          ? '✅ Az étterem elfogadta'
+                          : '⏳ Várakozik az étterem elfogadására'}
                   </Text>
-                  <Text style={styles.feeText}>+{order.deliveryFee || 700} lej díj</Text>
+                  <Text style={styles.feeText}>+{order.deliveryFee ?? 0} lej díj</Text>
                 </View>
 
                 <Text style={styles.restaurantName}>{order.restaurantName}</Text>
@@ -267,22 +283,30 @@ export default function CourierScreen({ onLogout }) {
                     <Text style={styles.routeLabel}>Hova: </Text>
                     {order.deliveryAddress || 'Kiszállítási cím'}
                   </Text>
+                  <Text style={styles.routeLine}>
+                    <Text style={styles.routeLabel}>Címzett: </Text>
+                    {order.customerName}
+                  </Text>
                 </View>
 
                 <View style={styles.cardFooter}>
                   <Text style={styles.totalText}>Érték: {order.totalAmount} lej</Text>
 
-                  <TouchableOpacity
-                    style={styles.acceptBtn}
-                    onPress={() => handleStatusChange(order.id, 'on_the_way')}
-                    disabled={updatingId === order.id}
-                  >
-                    {updatingId === order.id ? (
-                      <ActivityIndicator color="#FFFFFF" size="small" />
-                    ) : (
-                      <Text style={styles.acceptBtnText}>Rendelés felvétele →</Text>
-                    )}
-                  </TouchableOpacity>
+                  {order.status === 'ready' ? (
+                    <TouchableOpacity
+                      style={styles.acceptBtn}
+                      onPress={() => handleStatusChange(order.id, 'DELIVERING')}
+                      disabled={updatingId === order.id}
+                    >
+                      {updatingId === order.id ? (
+                        <ActivityIndicator color="#FFFFFF" size="small" />
+                      ) : (
+                        <Text style={styles.acceptBtnText}>Rendelés felvétele →</Text>
+                      )}
+                    </TouchableOpacity>
+                  ) : (
+                    <Text style={styles.waitingText}>Felvétel az elkészülés után</Text>
+                  )}
                 </View>
               </View>
             ))
@@ -308,6 +332,12 @@ const styles = StyleSheet.create({
     marginTop: 12,
     fontSize: 14,
     color: '#666666',
+  },
+  errorText: {
+    color: '#C62828',
+    fontSize: 13,
+    textAlign: 'center',
+    marginBottom: 16,
   },
   topHeader: {
     flexDirection: 'row',
@@ -490,6 +520,12 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontWeight: 'bold',
     fontSize: 13,
+  },
+  waitingText: {
+    maxWidth: 150,
+    fontSize: 12,
+    color: '#7A685D',
+    textAlign: 'right',
   },
   deliverBtn: {
     backgroundColor: '#2E7D32',
