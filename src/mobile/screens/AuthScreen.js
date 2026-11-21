@@ -20,6 +20,8 @@ export default function AuthScreen({ onNavigateToHome }) {
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
   const [role, setRole] = useState('customer');
+  const [vehicleType, setVehicleType] = useState('');
+  const [licensePlate, setLicensePlate] = useState('');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState(null);
 
@@ -45,6 +47,26 @@ export default function AuthScreen({ onNavigateToHome }) {
       return;
     }
 
+    if (!isLogin && password.length < 6) {
+      showError('A jelszónak legalább 6 karakter hosszúnak kell lennie!');
+      return;
+    }
+
+    if (!isLogin && role === 'courier' && !vehicleType.trim()) {
+      showError('Kérjük add meg a jármű típusát!');
+      return;
+    }
+
+    if (!isLogin && role === 'courier' && vehicleType.trim().length > 100) {
+      showError('A jármű típusa legfeljebb 100 karakter lehet!');
+      return;
+    }
+
+    if (!isLogin && role === 'courier' && licensePlate.trim().length > 50) {
+      showError('A rendszám legfeljebb 50 karakter lehet!');
+      return;
+    }
+
     setLoading(true);
     setMessage(null);
 
@@ -59,25 +81,26 @@ export default function AuthScreen({ onNavigateToHome }) {
         const data = await response.json().catch(() => ({}));
 
         if (!response.ok) {
-          showError(data.message || 'Sikertelen bejelentkezés!');
-        } else if (!data.token) {
-          showError('A szerver válasza hiányos: nem érkezett token.');
+          showError(data.error || data.message || 'Sikertelen bejelentkezés!');
+        } else if (!data.token || !data.user) {
+          showError('A szerver válasza hiányos: nem érkezett felhasználói munkamenet.');
         } else {
           await AsyncStorage.setItem('userToken', data.token);
-          if (data.user) {
-            await AsyncStorage.setItem('userData', JSON.stringify(data.user));
-          }
-          onNavigateToHome?.();
+          await AsyncStorage.setItem('userData', JSON.stringify(data.user));
+          onNavigateToHome?.(data.user);
         }
       } else {
         const response = await fetch(`${API_BASE_URL}/auth/register`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            name: fullName.trim(),
+            fullName: fullName.trim(),
             email: cleanEmail,
             password,
-            role,
+            accountType: role.toUpperCase(),
+            ...(role === 'courier'
+              ? { vehicleType: vehicleType.trim(), licensePlate: licensePlate.trim() }
+              : {}),
           }),
         });
 
@@ -91,7 +114,7 @@ export default function AuthScreen({ onNavigateToHome }) {
             text: 'Fiókod elkészült. Most már bejelentkezhetsz!',
           });
         } else {
-          showError(data.message || 'Sikertelen regisztráció!');
+          showError(data.error || data.message || 'Sikertelen regisztráció!');
         }
       }
     } catch (error) {
@@ -197,6 +220,33 @@ export default function AuthScreen({ onNavigateToHome }) {
                   </TouchableOpacity>
                 </View>
               </View>
+            )}
+
+            {!isLogin && role === 'courier' && (
+              <>
+                <View style={styles.inputContainer}>
+                  <Text style={styles.label}>Jármű típusa</Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Robogó"
+                    value={vehicleType}
+                    onChangeText={setVehicleType}
+                    maxLength={100}
+                  />
+                </View>
+
+                <View style={styles.inputContainer}>
+                  <Text style={styles.label}>Rendszám (nem kötelező)</Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="ABC-123"
+                    value={licensePlate}
+                    onChangeText={setLicensePlate}
+                    autoCapitalize="characters"
+                    maxLength={50}
+                  />
+                </View>
+              </>
             )}
 
             {message ? (
