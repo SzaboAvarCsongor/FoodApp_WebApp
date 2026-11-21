@@ -263,7 +263,7 @@ function RestaurantDashboard() {
       <OrdersPanel />
 
       {/* job posts and applicants */}
-      <JobsPanel restaurantId={restaurant.id} />
+      <JobsPanel />
     </main>
   );
 }

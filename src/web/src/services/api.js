@@ -92,6 +92,26 @@ function mapOrder(row) {
     customerName: row.profiles?.full_name || "Vásárló",
   };
 }
+// a job post row with its restaurant or applicants
+function mapJob(row) {
+  return {
+    id: row.id,
+    title: row.title,
+    type: row.position_type,
+    description: row.description || "",
+    createdAt: row.created_at,
+    restaurant: row.restaurants
+      ? { id: row.restaurants.id, name: row.restaurants.name, category: row.restaurants.category }
+      : null,
+    applications: (row.job_application || []).map((a) => ({
+      id: a.id,
+      name: a.profiles?.full_name || "Jelentkező",
+      message: a.message,
+      cvUrl: a.cv_url,
+      createdAt: a.created_at,
+    })),
+  };
+}
 
 // ---------- public ----------
 
@@ -213,4 +233,34 @@ export async function fetchRestaurantOrders() {
 // change the status of an order
 export function changeOrderStatus(orderId, status) {
   return request("PATCH", `/api/orders/${orderId}/status`, { status });
+}
+
+// ---------- jobs ----------
+
+export async function fetchJobs() {
+  const rows = await get("/api/jobs");
+  return rows.map(mapJob);
+}
+
+// ids of the jobs the logged in customer applied to
+export function fetchAppliedJobIds() {
+  return get("/api/jobs/applied");
+}
+
+export function applyToJob(jobId, { message, cvUrl }) {
+  return request("POST", `/api/jobs/${jobId}/apply`, { message, cvUrl });
+}
+
+// job posts of my restaurant with the applicants
+export async function fetchMyJobs() {
+  const rows = await get("/api/jobs/mine");
+  return rows.map(mapJob);
+}
+
+export function createJob({ title, type, description }) {
+  return request("POST", "/api/jobs", { title, type, description });
+}
+
+export function deleteJob(jobId) {
+  return request("DELETE", `/api/jobs/${jobId}`);
 }

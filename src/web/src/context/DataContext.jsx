@@ -5,30 +5,6 @@ import { categories } from "../data/restaurants";
 
 const DataContext = createContext(null);
 
-const JOBS_KEY = "foodapp_jobs";
-
-// state that is saved to localstorage on every change (jobs only, for now)
-function useStored(key, initial) {
-  const [value, setValue] = useState(() => {
-    try {
-      const raw = localStorage.getItem(key);
-      return raw ? JSON.parse(raw) : initial;
-    } catch {
-      return initial;
-    }
-  });
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(key, JSON.stringify(value));
-    } catch {
-      // storage can be full or blocked, the app still works without saving
-    }
-  }, [key, value]);
-
-  return [value, setValue];
-}
-
 // emoji and color are not in the database, take them from the category
 function look(restaurant) {
   return {
@@ -51,9 +27,6 @@ export function DataProvider({ children }) {
 
   // the restaurant of the logged in restaurant admin
   const [myRestaurant, setMyRestaurant] = useState(null);
-
-  // still local until the backend has endpoints for jobs
-  const [jobs, setJobs] = useStored(JOBS_KEY, []);
 
   // load everything the current user can see
   const reload = useCallback(async () => {
@@ -133,49 +106,6 @@ export function DataProvider({ children }) {
     await reload();
   }
 
-  // ---------- jobs (local for now) ----------
-
-  function addJob(restaurantId, { title, type, description }) {
-    const job = {
-      id: `j-${Date.now()}`,
-      restaurantId,
-      title,
-      type,
-      description,
-      createdAt: new Date().toISOString(),
-      applications: [],
-    };
-
-    setJobs((current) => [job, ...current]);
-  }
-
-  function removeJob(jobId) {
-    setJobs((current) => current.filter((job) => job.id !== jobId));
-  }
-
-  function applyToJob(jobId, { userId, name, message, cvUrl }) {
-    setJobs((current) =>
-      current.map((job) =>
-        job.id === jobId
-          ? {
-              ...job,
-              applications: [
-                ...job.applications,
-                {
-                  id: `a-${Date.now()}`,
-                  userId,
-                  name,
-                  message,
-                  cvUrl,
-                  createdAt: new Date().toISOString(),
-                },
-              ],
-            }
-          : job
-      )
-    );
-  }
-
   return (
     <DataContext.Provider
       value={{
@@ -191,10 +121,6 @@ export function DataProvider({ children }) {
         toggleActive,
         addMenuItem,
         removeMenuItem,
-        jobs,
-        addJob,
-        removeJob,
-        applyToJob,
       }}
     >
       {children}

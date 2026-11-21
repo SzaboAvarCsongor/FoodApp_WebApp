@@ -5,6 +5,7 @@ import restaurantRoutes from './routes/restaurantRoutes.js';
 import orderRoutes from './routes/orderRoutes.js';
 import authRoutes from './routes/authRoutes.js';
 import manageRoutes from './routes/manageRoutes.js';
+import jobRoutes from './routes/jobRoutes.js';
 
 dotenv.config();
 
@@ -15,7 +16,8 @@ app.use(cors());
 app.use(express.json());
 
 app.use('/api/auth', authRoutes);
-app.use('/api/manage', manageRoutes); 
+app.use('/api/manage', manageRoutes);
+app.use('/api/jobs', jobRoutes); 
 
 app.use('/api/restaurants', restaurantRoutes);
 app.use('/api/orders', orderRoutes);
