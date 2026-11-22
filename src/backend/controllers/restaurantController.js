@@ -2,7 +2,7 @@ import { supabase } from '../supabaseClient.js';
 
 // public fields only, the invite code must never be sent to customers
 const publicFields =
-  'id, name, category, address, image_url, delivery_fee, delivery_time_min, delivery_time_max, is_approved';
+  'id, name, category, address, latitude, longitude, image_url, delivery_fee, delivery_time_min, delivery_time_max, is_approved';
 
 // replace the reviews list with the average rating
 function withRating(row) {

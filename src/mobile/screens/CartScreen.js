@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   StyleSheet,
   Text,
@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
   TextInput,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { fetchWithAuth } from '../services/api';
 
 const DEFAULT_DELIVERY_FEE = 790;
@@ -29,6 +30,19 @@ export default function CartScreen({
   const [errorMessage, setErrorMessage] = useState('');
   const [orderPlaced, setOrderPlaced] = useState(false);
   const [deliveryAddress, setDeliveryAddress] = useState('');
+
+  useEffect(() => {
+    let active = true;
+    AsyncStorage.getItem('deliveryAddress')
+      .then((address) => {
+        if (active && address) setDeliveryAddress(address);
+      })
+      .catch((error) => console.error('Mentett cím betöltési hiba:', error));
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const deliveryFee = cartItems.length > 0 ? roundMoney(deliveryFeeProp) : 0;
   const itemsTotal = roundMoney(
@@ -74,6 +88,11 @@ export default function CartScreen({
         body: JSON.stringify(orderPayload),
       });
 
+      try {
+        await AsyncStorage.setItem('deliveryAddress', deliveryAddress.trim());
+      } catch (error) {
+        console.error('Mentett cím frissítési hiba:', error);
+      }
       onClearCart?.();
       setOrderPlaced(true);
     } catch (error) {

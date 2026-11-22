@@ -8,19 +8,19 @@ import RestaurantDetailScreen from './screens/RestaurantDetailScreen';
 import CartScreen from './screens/CartScreen';
 import OrdersScreen from './screens/OrdersScreen';
 import CourierScreen from './screens/CourierScreen';
+import ProfileScreen from './screens/ProfileScreen';
 
 const isCourier = (user) =>
   typeof user?.role === 'string' && user.role.toUpperCase() === 'COURIER';
 
 export default function App() {
-  const [currentScreen, setCurrentScreen] = useState('home'); // 'home' | 'auth' | 'restaurant' | 'cart' | 'orders' | 'courier'
+  const [currentScreen, setCurrentScreen] = useState('home');
   const [cartReturnScreen, setCartReturnScreen] = useState('home');
   const [selectedRestaurantId, setSelectedRestaurantId] = useState(null);
   const [cartItems, setCartItems] = useState([]);
   const [cartRestaurant, setCartRestaurant] = useState(null);
   const [pendingAdd, setPendingAdd] = useState(null);
 
-  // Indításkor ellenőrizzük, hogy futár van-e bejelentkezve
   useEffect(() => {
     const checkUserRole = async () => {
       try {
@@ -38,7 +38,6 @@ export default function App() {
     checkUserRole();
   }, []);
 
-  // Bejelentkezés utáni átirányítás szerepkör alapján
   const handleAuthSuccess = (user) => {
     if (isCourier(user)) {
       setCurrentScreen('courier');
@@ -47,7 +46,6 @@ export default function App() {
     }
   };
 
-  // Kijelentkezés (futárnál és vásárlónál is használható)
   const handleLogout = async () => {
     await AsyncStorage.multiRemove(['userToken', 'userData']);
     setCartItems([]);
@@ -128,16 +126,14 @@ export default function App() {
     <View style={styles.root}>
       <StatusBar style="auto" />
 
-      {/* Futár nézet */}
       {currentScreen === 'courier' && (
         <CourierScreen onLogout={handleLogout} />
       )}
 
-      {/* Vásárlói Főoldal */}
       <View style={[styles.root, currentScreen !== 'home' && styles.hidden]}>
         <HomeScreen
           cartCount={cartCount}
-          onNavigateToAuth={() => setCurrentScreen('auth')}
+          onNavigateToProfile={() => setCurrentScreen('profile')}
           onNavigateToCart={() => openCart('home')}
           onNavigateToOrders={() => setCurrentScreen('orders')}
           onSelectRestaurant={(id) => {
@@ -147,12 +143,10 @@ export default function App() {
         />
       </View>
 
-      {/* Bejelentkezés / Regisztráció */}
       {currentScreen === 'auth' && (
         <AuthScreen onNavigateToHome={handleAuthSuccess} />
       )}
 
-      {/* Étterem menü */}
       {currentScreen === 'restaurant' && (
         <RestaurantDetailScreen
           restaurantId={selectedRestaurantId}
@@ -163,7 +157,6 @@ export default function App() {
         />
       )}
 
-      {/* Kosár */}
       {currentScreen === 'cart' && (
         <CartScreen
           cartItems={cartItems}
@@ -177,7 +170,6 @@ export default function App() {
         />
       )}
 
-      {/* Vásárlói rendeléskövetés */}
       {currentScreen === 'orders' && (
         <OrdersScreen
           onBack={() => setCurrentScreen('home')}
@@ -188,7 +180,16 @@ export default function App() {
         />
       )}
 
-      {/* Kosár felülírása figyelmeztető ablak */}
+      {currentScreen === 'profile' && (
+        <ProfileScreen
+          onBack={() => setCurrentScreen('home')}
+          onNavigateToAuth={() => setCurrentScreen('auth')}
+          onNavigateToOrders={() => setCurrentScreen('orders')}
+          onNavigateToCart={() => openCart('profile')}
+          onLogout={handleLogout}
+        />
+      )}
+
       <Modal
         transparent
         animationType="fade"

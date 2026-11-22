@@ -33,7 +33,7 @@ function getCategoryIcon(category) {
 
 export default function HomeScreen({
   cartCount = 0,
-  onNavigateToAuth,
+  onNavigateToProfile,
   onNavigateToCart,
   onNavigateToOrders,
   onSelectRestaurant,
@@ -137,7 +137,7 @@ export default function HomeScreen({
             )}
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.profileBtn} onPress={onNavigateToAuth}>
+          <TouchableOpacity style={styles.profileBtn} onPress={onNavigateToProfile}>
             <Text style={styles.profileIcon}>👤</Text>
           </TouchableOpacity>
         </View>
