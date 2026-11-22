@@ -60,9 +60,16 @@ export const login = async (req, res) => {
   });
 };
 
-// register: the role is decided here, the browser only asks for a type
 export const register = async (req, res) => {
-  const { fullName, email, password, accountType, restaurantCode } = req.body;
+  const {
+    fullName,
+    email,
+    password,
+    accountType,
+    restaurantCode,
+    vehicleType,
+    licensePlate,
+  } = req.body;
 
   if (
     typeof fullName !== 'string' ||
@@ -74,15 +81,26 @@ export const register = async (req, res) => {
   ) {
     return res.status(400).json({ error: 'Hiányzó vagy hibás adatok.' });
   }
-  if (accountType && !['CUSTOMER', 'RESTAURANT_ADMIN'].includes(accountType)) {
+  if (accountType && !['CUSTOMER', 'COURIER', 'RESTAURANT_ADMIN'].includes(accountType)) {
     return res.status(400).json({ error: 'Érvénytelen fióktípus.' });
   }
+  if (
+    accountType === 'COURIER' &&
+    (typeof vehicleType !== 'string' || !vehicleType.trim() || vehicleType.trim().length > 100)
+  ) {
+    return res.status(400).json({ error: 'Add meg a jármű típusát (legfeljebb 100 karakter).' });
+  }
+  if (
+    accountType === 'COURIER' &&
+    licensePlate != null &&
+    (typeof licensePlate !== 'string' || licensePlate.trim().length > 50)
+  ) {
+    return res.status(400).json({ error: 'A rendszám legfeljebb 50 karakter lehet.' });
+  }
 
-  // super admin and courier can never be requested here
-  const role = accountType === 'RESTAURANT_ADMIN' ? 'RESTAURANT_ADMIN' : 'CUSTOMER';
+  const role = accountType || 'CUSTOMER';
   const cleanEmail = email.trim().toLowerCase();
 
-  // a restaurant admin needs a valid code that nobody used yet
   let restaurant = null;
   if (role === 'RESTAURANT_ADMIN') {
     const { data } = await supabase
@@ -98,7 +116,6 @@ export const register = async (req, res) => {
     restaurant = data;
   }
 
-  // create the supabase auth user (the password is hashed by supabase)
   const { data: created, error } = await supabase.auth.admin.createUser({
     email: cleanEmail,
     password,
@@ -123,12 +140,38 @@ export const register = async (req, res) => {
   });
 
   if (profileError) {
-    // do not leave an auth user without a profile
-    await supabase.auth.admin.deleteUser(userId);
+    const { error: cleanupError } = await supabase.auth.admin.deleteUser(userId);
+    if (cleanupError) {
+      console.error('Auth felhasználó takarítási hiba:', cleanupError.message);
+    }
     return res.status(500).json({ error: profileError.message });
   }
 
-  // the code is used up from now on
+  if (role === 'COURIER') {
+    const { error: courierError } = await supabase.from('courier_details').insert({
+      id: userId,
+      vehicle_type: vehicleType.trim(),
+      license_plate: licensePlate?.trim() || null,
+    });
+
+    if (courierError) {
+      const { error: profileCleanupError } = await supabase
+        .from('profiles')
+        .delete()
+        .eq('id', userId);
+      const { error: authCleanupError } = await supabase.auth.admin.deleteUser(userId);
+
+      if (profileCleanupError || authCleanupError) {
+        console.error('Futárfiók takarítási hiba:', {
+          profile: profileCleanupError?.message,
+          auth: authCleanupError?.message,
+        });
+      }
+
+      return res.status(500).json({ error: 'Nem sikerült létrehozni a futárprofilt.' });
+    }
+  }
+
   if (restaurant) {
     await supabase
       .from('restaurants')
@@ -140,7 +183,6 @@ export const register = async (req, res) => {
   res.status(201).json({ message: 'Sikeres regisztráció.' });
 };
 
-// the profile of the logged in user (the web calls this after login)
 export const me = async (req, res) => {
   let restaurantId = null;
 

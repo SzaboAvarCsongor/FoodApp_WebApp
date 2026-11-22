@@ -69,8 +69,24 @@ export const getUserOrders = async (req, res) => {
   try {
     const { data, error } = await supabase
       .from('orders')
-      .select('*, restaurants(name, category), order_items(*, menu_items(*))')
+      .select('*, restaurants(name, category), reviews(rating, comment), order_items(*, menu_items(*))')
       .eq('customer_id', userId)
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+
+    res.status(200).json(data);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+export const getMyOrders = async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('orders')
+      .select('*, restaurants(name, category), order_items(*, menu_items(*))')
+      .eq('customer_id', req.user.id)
       .order('created_at', { ascending: false });
 
     if (error) throw error;
@@ -102,6 +118,39 @@ export const getRestaurantOrders = async (req, res) => {
 
     res.status(200).json(data);
   } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+export const getCourierOrders = async (req, res) => {
+  const orderFields =
+    '*, restaurants(name, address), profiles!orders_customer_id_fkey(full_name), order_items(*, menu_items(name))';
+
+  try {
+    const [availableResult, assignedResult] = await Promise.all([
+      supabase
+        .from('orders')
+        .select(orderFields)
+        .in('status', ['PENDING', 'ACCEPTED', 'PREPARING', 'READY'])
+        .is('courier_id', null)
+        .order('created_at', { ascending: false }),
+      supabase
+        .from('orders')
+        .select(orderFields)
+        .eq('courier_id', req.user.id)
+        .in('status', ['DELIVERING', 'DELIVERED'])
+        .order('created_at', { ascending: false }),
+    ]);
+
+    if (availableResult.error) throw availableResult.error;
+    if (assignedResult.error) throw assignedResult.error;
+
+    const orders = [...(availableResult.data || []), ...(assignedResult.data || [])]
+      .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+    res.status(200).json(orders);
+  } catch (err) {
+    console.error('Futár rendelések betöltési hiba:', err);
     res.status(500).json({ error: err.message });
   }
 };
@@ -152,6 +201,43 @@ export const updateOrderStatus = async (req, res) => {
 
     res.status(200).json({ message: 'Állapot frissítve.', status });
   } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+export const updateCourierOrderStatus = async (req, res) => {
+  const { id } = req.params;
+  const { status } = req.body;
+
+  if (!['DELIVERING', 'DELIVERED'].includes(status)) {
+    return res.status(400).json({ error: 'Érvénytelen futár rendelési állapot.' });
+  }
+
+  try {
+    let update = supabase
+      .from('orders')
+      .update(status === 'DELIVERING' ? { status, courier_id: req.user.id } : { status })
+      .eq('id', id);
+
+    if (status === 'DELIVERING') {
+      update = update.eq('status', 'READY').is('courier_id', null).select('id').maybeSingle();
+    } else {
+      update = update
+        .eq('status', 'DELIVERING')
+        .eq('courier_id', req.user.id)
+        .select('id')
+        .maybeSingle();
+    }
+
+    const { data, error } = await update;
+    if (error) throw error;
+    if (!data) {
+      return res.status(409).json({ error: 'A rendelés már nem elérhető vagy nem hozzád tartozik.' });
+    }
+
+    res.status(200).json({ message: 'Állapot frissítve.', status });
+  } catch (err) {
+    console.error('Futár rendelési állapot frissítési hiba:', err);
     res.status(500).json({ error: err.message });
   }
 };

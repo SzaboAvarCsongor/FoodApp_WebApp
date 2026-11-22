@@ -6,6 +6,7 @@ import orderRoutes from './routes/orderRoutes.js';
 import authRoutes from './routes/authRoutes.js';
 import manageRoutes from './routes/manageRoutes.js';
 import jobRoutes from './routes/jobRoutes.js';
+import reviewRoutes from './routes/reviewRoutes.js';
 
 dotenv.config();
 
@@ -19,6 +20,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/manage', manageRoutes);
 app.use('/api/jobs', jobRoutes); 
 
+app.use('/api/reviews', reviewRoutes);
 app.use('/api/restaurants', restaurantRoutes);
 app.use('/api/orders', orderRoutes);
 
