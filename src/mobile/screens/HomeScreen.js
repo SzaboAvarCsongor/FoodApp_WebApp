@@ -32,11 +32,14 @@ function getCategoryIcon(category) {
 }
 
 export default function HomeScreen({
-  cartCount = 0,
+  onNavigateToAuth,
   onNavigateToProfile,
   onNavigateToCart,
   onNavigateToOrders,
   onSelectRestaurant,
+  onOpenAddressPicker,
+  deliveryAddress,
+  cartCount = 0,
 }) {
   const [restaurants, setRestaurants] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -103,22 +106,15 @@ export default function HomeScreen({
     return matchesCategory && matchesSearch;
   });
 
-  if (loading) {
-    return (
-      <SafeAreaView style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#FF5722" />
-        <Text style={styles.loadingText}>Éttermek betöltése...</Text>
-      </SafeAreaView>
-    );
-  }
-
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.topHeader}>
         <View style={styles.addressContainer}>
           <Text style={styles.addressLabel}>Kiszállítás ide:</Text>
-          <TouchableOpacity style={styles.addressSelector}>
-            <Text style={styles.addressText}>📍 Válassz címet</Text>
+          <TouchableOpacity style={styles.addressSelector} onPress={onOpenAddressPicker}>
+            <Text style={styles.addressText} numberOfLines={1}>
+              📍 {deliveryAddress || 'Válassz címet'}
+            </Text>
             <Text style={styles.dropdownArrow}>▼</Text>
           </TouchableOpacity>
         </View>
@@ -204,7 +200,12 @@ export default function HomeScreen({
         </View>
 
         <View style={styles.restaurantsGrid}>
-          {filteredRestaurants.map((item) => (
+          {loading ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color="#FF5722" />
+              <Text style={styles.loadingText}>Éttermek betöltése...</Text>
+            </View>
+          ) : filteredRestaurants.map((item) => (
             <TouchableOpacity
               key={item.id}
               style={styles.card}
@@ -260,7 +261,7 @@ export default function HomeScreen({
           ))}
         </View>
 
-        {loadError ? (
+        {!loading && loadError ? (
           <View style={styles.emptyState}>
             <Text style={styles.emptyStateText}>{loadError}</Text>
             <TouchableOpacity
@@ -274,7 +275,7 @@ export default function HomeScreen({
               <Text style={styles.retryButtonText}>Újrapróbálás</Text>
             </TouchableOpacity>
           </View>
-        ) : filteredRestaurants.length === 0 ? (
+        ) : !loading && filteredRestaurants.length === 0 ? (
           <View style={styles.emptyState}>
             <Text style={styles.emptyStateText}>
               {restaurants.length ? 'Nincs találat a keresésre.' : 'Jelenleg nincs elérhető étterem.'}

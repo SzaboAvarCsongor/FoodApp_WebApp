@@ -6,6 +6,15 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
+    "plugins": [
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "A FoodApp a szállítási cím meghatározásához használja a tartózkodási helyedet."
+        }
+      ],
+      "expo-status-bar"
+    ],
     "ios": {
       "supportsTablet": true
     },

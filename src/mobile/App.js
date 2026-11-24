@@ -9,9 +9,19 @@ import CartScreen from './screens/CartScreen';
 import OrdersScreen from './screens/OrdersScreen';
 import CourierScreen from './screens/CourierScreen';
 import ProfileScreen from './screens/ProfileScreen';
+import AddressPickerModal from './components/AddressPickerModal';
+import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 
 const isCourier = (user) =>
   typeof user?.role === 'string' && user.role.toUpperCase() === 'COURIER';
+
+const isValidCoords = (coords) =>
+  Number.isFinite(coords?.latitude) &&
+  Number.isFinite(coords?.longitude) &&
+  coords.latitude >= -90 &&
+  coords.latitude <= 90 &&
+  coords.longitude >= -180 &&
+  coords.longitude <= 180;
 
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState('home');
@@ -20,23 +30,58 @@ export default function App() {
   const [cartItems, setCartItems] = useState([]);
   const [cartRestaurant, setCartRestaurant] = useState(null);
   const [pendingAdd, setPendingAdd] = useState(null);
+  const [deliveryAddress, setDeliveryAddress] = useState('');
+  const [deliveryCoords, setDeliveryCoords] = useState(null);
+  const [addressModalVisible, setAddressModalVisible] = useState(false);
 
   useEffect(() => {
-    const checkUserRole = async () => {
+    const initApp = async () => {
       try {
-        const userDataStr = await AsyncStorage.getItem('userData');
-        if (userDataStr) {
-          const user = JSON.parse(userDataStr);
+        const [userDataStr, savedAddress, savedCoordsStr] = await AsyncStorage.multiGet([
+          'userData',
+          'deliveryAddress',
+          'deliveryCoords',
+        ]);
+
+        if (userDataStr[1]) {
+          const user = JSON.parse(userDataStr[1]);
           if (isCourier(user)) {
             setCurrentScreen('courier');
           }
         }
+
+        if (savedAddress[1]) {
+          setDeliveryAddress(savedAddress[1]);
+        }
+
+        if (savedCoordsStr[1]) {
+          const coords = JSON.parse(savedCoordsStr[1]);
+          setDeliveryCoords(isValidCoords(coords) ? coords : null);
+        }
       } catch (e) {
-        console.log('Szerepkör ellenőrzési hiba:', e);
+        console.log('Inicializálási hiba:', e);
       }
     };
-    checkUserRole();
+    initApp();
   }, []);
+
+  const handleConfirmAddress = async ({ address, coords }) => {
+    setDeliveryAddress(address);
+    setDeliveryCoords(isValidCoords(coords) ? coords : null);
+    try {
+      await AsyncStorage.multiSet([
+        ['deliveryAddress', address],
+        ['deliveryCoords', JSON.stringify(isValidCoords(coords) ? coords : null)],
+      ]);
+    } catch (e) {
+      console.log('Cím mentési hiba:', e);
+    }
+  };
+
+  const handleCartAddressChange = (address) => {
+    setDeliveryAddress(address);
+    setDeliveryCoords(null);
+  };
 
   const handleAuthSuccess = (user) => {
     if (isCourier(user)) {
@@ -123,102 +168,118 @@ export default function App() {
     cartRestaurant?.delivery_fee != null ? Number(cartRestaurant.delivery_fee) : undefined;
 
   return (
-    <View style={styles.root}>
-      <StatusBar style="auto" />
+    <SafeAreaProvider>
+      <SafeAreaView style={styles.root} edges={['top']}>
+        <StatusBar style="auto" />
 
-      {currentScreen === 'courier' && (
-        <CourierScreen onLogout={handleLogout} />
-      )}
+        {currentScreen === 'courier' && (
+          <CourierScreen onLogout={handleLogout} />
+        )}
 
-      <View style={[styles.root, currentScreen !== 'home' && styles.hidden]}>
-        <HomeScreen
-          cartCount={cartCount}
-          onNavigateToProfile={() => setCurrentScreen('profile')}
-          onNavigateToCart={() => openCart('home')}
-          onNavigateToOrders={() => setCurrentScreen('orders')}
-          onSelectRestaurant={(id) => {
-            setSelectedRestaurantId(id);
-            setCurrentScreen('restaurant');
-          }}
+        <View style={[styles.root, currentScreen !== 'home' && styles.hidden]}>
+          <HomeScreen
+            cartCount={cartCount}
+            onNavigateToProfile={() => setCurrentScreen('profile')}
+            deliveryAddress={deliveryAddress}
+            onOpenAddressPicker={() => setAddressModalVisible(true)}
+            onNavigateToCart={() => openCart('home')}
+            onNavigateToOrders={() => setCurrentScreen('orders')}
+            onSelectRestaurant={(id) => {
+              setSelectedRestaurantId(id);
+              setCurrentScreen('restaurant');
+            }}
+          />
+        </View>
+
+        {currentScreen === 'auth' && (
+          <AuthScreen onNavigateToHome={handleAuthSuccess} />
+        )}
+
+        {currentScreen === 'restaurant' && (
+          <RestaurantDetailScreen
+            restaurantId={selectedRestaurantId}
+            cartCount={cartCount}
+            onBack={() => setCurrentScreen('home')}
+            onNavigateToCart={() => openCart('restaurant')}
+            onAddToCart={handleAddToCart}
+          />
+        )}
+
+        {currentScreen === 'cart' && (
+          <CartScreen
+            cartItems={cartItems}
+            restaurantId={cartRestaurant?.id}
+            deliveryFee={cartDeliveryFee}
+            deliveryAddress={deliveryAddress}
+            deliveryCoords={deliveryCoords}
+            onOpenAddressPicker={() => setAddressModalVisible(true)}
+            onDeliveryAddressChange={handleCartAddressChange}
+            onUpdateQuantity={handleUpdateQuantity}
+            onRemoveItem={handleRemoveItem}
+            onClearCart={handleClearCart}
+            onBack={() => setCurrentScreen(cartReturnScreen)}
+            onOrderSuccess={() => setCurrentScreen('orders')}
+          />
+        )}
+
+        {currentScreen === 'orders' && (
+          <OrdersScreen
+            onBack={() => setCurrentScreen('home')}
+            onSelectRestaurant={(id) => {
+              setSelectedRestaurantId(id);
+              setCurrentScreen('restaurant');
+            }}
+          />
+        )}
+
+        {currentScreen === 'profile' && (
+          <ProfileScreen
+            onBack={() => setCurrentScreen('home')}
+            onNavigateToAuth={() => setCurrentScreen('auth')}
+            onNavigateToOrders={() => setCurrentScreen('orders')}
+            onNavigateToCart={() => openCart('profile')}
+            onLogout={handleLogout}
+          />
+        )}
+
+        <AddressPickerModal
+          visible={addressModalVisible}
+          initialAddress={deliveryAddress}
+          initialCoords={deliveryCoords}
+          onClose={() => setAddressModalVisible(false)}
+          onConfirmAddress={handleConfirmAddress}
         />
-      </View>
 
-      {currentScreen === 'auth' && (
-        <AuthScreen onNavigateToHome={handleAuthSuccess} />
-      )}
-
-      {currentScreen === 'restaurant' && (
-        <RestaurantDetailScreen
-          restaurantId={selectedRestaurantId}
-          cartCount={cartCount}
-          onBack={() => setCurrentScreen('home')}
-          onNavigateToCart={() => openCart('restaurant')}
-          onAddToCart={handleAddToCart}
-        />
-      )}
-
-      {currentScreen === 'cart' && (
-        <CartScreen
-          cartItems={cartItems}
-          restaurantId={cartRestaurant?.id}
-          deliveryFee={cartDeliveryFee}
-          onUpdateQuantity={handleUpdateQuantity}
-          onRemoveItem={handleRemoveItem}
-          onClearCart={handleClearCart}
-          onBack={() => setCurrentScreen(cartReturnScreen)}
-          onOrderSuccess={() => setCurrentScreen('orders')}
-        />
-      )}
-
-      {currentScreen === 'orders' && (
-        <OrdersScreen
-          onBack={() => setCurrentScreen('home')}
-          onSelectRestaurant={(id) => {
-            setSelectedRestaurantId(id);
-            setCurrentScreen('restaurant');
-          }}
-        />
-      )}
-
-      {currentScreen === 'profile' && (
-        <ProfileScreen
-          onBack={() => setCurrentScreen('home')}
-          onNavigateToAuth={() => setCurrentScreen('auth')}
-          onNavigateToOrders={() => setCurrentScreen('orders')}
-          onNavigateToCart={() => openCart('profile')}
-          onLogout={handleLogout}
-        />
-      )}
-
-      <Modal
-        transparent
-        animationType="fade"
-        visible={pendingAdd !== null}
-        onRequestClose={() => setPendingAdd(null)}
-      >
-        <View style={styles.modalBackdrop}>
-          <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>Új kosár indítása?</Text>
-            <Text style={styles.modalText}>
-              A kosarad egy másik étterem ételeit tartalmazza
-              {cartRestaurant?.name ? ` (${cartRestaurant.name})` : ''}. Egy rendelésben csak
-              egy étteremből rendelhetsz. Kiüríted a kosarat, és hozzáadod ezt a tételt?
-            </Text>
-            <View style={styles.modalButtons}>
-              <TouchableOpacity
-                style={styles.modalSecondaryBtn}
-                onPress={() => setPendingAdd(null)}
-              >
-                <Text style={styles.modalSecondaryText}>Mégse</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.modalPrimaryBtn} onPress={confirmReplaceCart}>
-                <Text style={styles.modalPrimaryText}>Kosár ürítése</Text>
-              </TouchableOpacity>
+        <Modal
+          transparent
+          animationType="fade"
+          visible={pendingAdd !== null}
+          onRequestClose={() => setPendingAdd(null)}
+        >
+          <View style={styles.modalBackdrop}>
+            <View style={styles.modalCard}>
+              <Text style={styles.modalTitle}>Új kosár indítása?</Text>
+              <Text style={styles.modalText}>
+                A kosarad egy másik étterem ételeit tartalmazza
+                {cartRestaurant?.name ? ` (${cartRestaurant.name})` : ''}. Egy rendelésben csak
+                egy étteremből rendelhetsz. Kiüríted a kosarat, és hozzáadod ezt a tételt?
+              </Text>
+              <View style={styles.modalButtons}>
+                <TouchableOpacity
+                  style={styles.modalSecondaryBtn}
+                  onPress={() => setPendingAdd(null)}
+                >
+                  <Text style={styles.modalSecondaryText}>Mégse</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.modalPrimaryBtn} onPress={confirmReplaceCart}>
+                  <Text style={styles.modalPrimaryText}>Kosár ürítése</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
-        </View>
-      </Modal>
-    </View>
+        </Modal>
+      </SafeAreaView>
+    </SafeAreaProvider>
   );
 }
 
@@ -279,5 +340,9 @@ const styles = StyleSheet.create({
   modalPrimaryText: {
     color: '#FFFFFF',
     fontWeight: 'bold',
+  },
+  root: {
+  flex: 1,
+  backgroundColor: '#1A1A1A', 
   },
 });
