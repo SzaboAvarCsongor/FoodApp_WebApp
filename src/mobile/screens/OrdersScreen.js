@@ -10,6 +10,7 @@ import {
   RefreshControl,
 } from 'react-native';
 import { fetchWithAuth } from '../services/api';
+import usePolling from '../hooks/usePolling';
 
 const ORDER_STATUSES = {
   pending: { label: 'Feldolgozás alatt ⏳', step: 1 },
@@ -90,6 +91,7 @@ export default function OrdersScreen({ onBack, onSelectRestaurant }) {
     loadOrders();
   };
 
+  usePolling(loadOrders, 10000);
   const activeOrders = orders.filter((o) => o.status !== 'delivered' && o.status !== 'cancelled');
   const pastOrders = orders.filter((o) => o.status === 'delivered' || o.status === 'cancelled');
 

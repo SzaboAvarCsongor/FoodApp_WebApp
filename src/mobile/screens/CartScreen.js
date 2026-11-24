@@ -28,6 +28,7 @@ export default function CartScreen({
   onRemoveItem,
   onClearCart,
   onBack,
+  onBrowseRestaurants,
   onOrderSuccess,
 }) {
   const [loading, setLoading] = useState(false);
@@ -163,7 +164,7 @@ export default function CartScreen({
           <Text style={styles.emptySubtitle}>
             Nézz körül az éttermek kínálatában és válassz valami finomat!
           </Text>
-          <TouchableOpacity style={styles.exploreBtn} onPress={onBack}>
+          <TouchableOpacity style={styles.exploreBtn} onPress={onBrowseRestaurants || onBack}>
             <Text style={styles.exploreBtnText}>Éttermek böngészése</Text>
           </TouchableOpacity>
         </View>

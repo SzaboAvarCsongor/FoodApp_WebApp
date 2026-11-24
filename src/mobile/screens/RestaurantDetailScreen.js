@@ -114,7 +114,7 @@ export default function RestaurantDetailScreen({
       <ScrollView showsVerticalScrollIndicator={false}>
         <View style={styles.topRow}>
           <TouchableOpacity style={styles.backButton} onPress={onBack}>
-            <Text style={styles.backButtonText}>← Vissza az éttermekhez</Text>
+            <Text style={styles.backButtonText}>← Vissza</Text>
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.cartBtn} onPress={onNavigateToCart}>

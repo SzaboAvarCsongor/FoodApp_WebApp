@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { fetchWithAuth } from '../services/api';
+import usePolling from '../hooks/usePolling';
 
 const normalizeOrder = (order) => {
   const restaurant = Array.isArray(order.restaurants)
@@ -89,14 +90,11 @@ export default function CourierScreen({ onLogout }) {
   }, []);
 
   useEffect(() => {
-    // Both helpers update state only after their asynchronous reads complete.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadCourierProfile();
     loadOrders();
-    const refreshTimer = setInterval(loadOrders, 10000);
-
-    return () => clearInterval(refreshTimer);
   }, [loadCourierProfile, loadOrders]);
+
+  usePolling(loadOrders, 10000, updatingId === null);
 
   const onRefresh = () => {
     setRefreshing(true);

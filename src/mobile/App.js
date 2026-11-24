@@ -11,6 +11,8 @@ import CourierScreen from './screens/CourierScreen';
 import ProfileScreen from './screens/ProfileScreen';
 import AddressPickerModal from './components/AddressPickerModal';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
+import { BackHandler } from 'react-native';
+import { hasServicesEnabledAsync } from 'expo-location';
 
 const isCourier = (user) =>
   typeof user?.role === 'string' && user.role.toUpperCase() === 'COURIER';
@@ -25,7 +27,6 @@ const isValidCoords = (coords) =>
 
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState('home');
-  const [cartReturnScreen, setCartReturnScreen] = useState('home');
   const [selectedRestaurantId, setSelectedRestaurantId] = useState(null);
   const [cartItems, setCartItems] = useState([]);
   const [cartRestaurant, setCartRestaurant] = useState(null);
@@ -33,6 +34,7 @@ export default function App() {
   const [deliveryAddress, setDeliveryAddress] = useState('');
   const [deliveryCoords, setDeliveryCoords] = useState(null);
   const [addressModalVisible, setAddressModalVisible] = useState(false);
+  const [history, setHistory] = useState([]);
 
   useEffect(() => {
     const initApp = async () => {
@@ -65,6 +67,18 @@ export default function App() {
     initApp();
   }, []);
 
+  useEffect(() => {
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      if(history.length > 0){
+        setCurrentScreen(history[history.length - 1]);
+        setHistory(history.slice(0, -1));
+        return true;
+      }
+      return false;
+    });
+    return () => sub.remove();
+  }, [history]);
+
   const handleConfirmAddress = async ({ address, coords }) => {
     setDeliveryAddress(address);
     setDeliveryCoords(isValidCoords(coords) ? coords : null);
@@ -84,18 +98,14 @@ export default function App() {
   };
 
   const handleAuthSuccess = (user) => {
-    if (isCourier(user)) {
-      setCurrentScreen('courier');
-    } else {
-      setCurrentScreen('home');
-    }
+    resetTo(isCourier(user) ? 'courier' : 'home');
   };
 
   const handleLogout = async () => {
     await AsyncStorage.multiRemove(['userToken', 'userData']);
     setCartItems([]);
     setCartRestaurant(null);
-    setCurrentScreen('auth');
+    resetTo('auth');
   };
 
   const addToCart = (item, restaurant) => {
@@ -157,10 +167,25 @@ export default function App() {
     setCartRestaurant(null);
   };
 
-  const openCart = (fromScreen) => {
-    setCartReturnScreen(fromScreen);
-    setCurrentScreen('cart');
-  };
+  const navigateTo = (screen) => {
+    if(screen === currentScreen) return;
+    setHistory((prev) => [...prev, currentScreen]);
+    setCurrentScreen(screen);
+  }
+
+  const goBack = () => {
+    if(history.length === 0){
+      setCurrentScreen('home');
+      return;
+    }
+    setCurrentScreen(history[history.length - 1]);
+    setHistory(history.slice(0, -1));
+  }
+
+  const resetTo = (screen, stack = []) => {
+    setHistory(stack);
+    setCurrentScreen(screen);
+  }
 
   const cartCount = cartItems.reduce((sum, i) => sum + i.quantity, 0);
 
@@ -169,8 +194,8 @@ export default function App() {
 
   return (
     <SafeAreaProvider>
-      <SafeAreaView style={styles.root} edges={['top']}>
-        <StatusBar style="auto" />
+      <SafeAreaView style={styles.safeArea} edges={['top']}>
+        <StatusBar style="ligth" />
 
         {currentScreen === 'courier' && (
           <CourierScreen onLogout={handleLogout} />
@@ -179,14 +204,14 @@ export default function App() {
         <View style={[styles.root, currentScreen !== 'home' && styles.hidden]}>
           <HomeScreen
             cartCount={cartCount}
-            onNavigateToProfile={() => setCurrentScreen('profile')}
+            onNavigateToProfile={() => navigateTo('profile')}
             deliveryAddress={deliveryAddress}
             onOpenAddressPicker={() => setAddressModalVisible(true)}
-            onNavigateToCart={() => openCart('home')}
-            onNavigateToOrders={() => setCurrentScreen('orders')}
+            onNavigateToCart={() => navigateTo('cart')}
+            onNavigateToOrders={() => navigateTo('orders')}
             onSelectRestaurant={(id) => {
               setSelectedRestaurantId(id);
-              setCurrentScreen('restaurant');
+              navigateTo('restaurant');
             }}
           />
         </View>
@@ -199,8 +224,8 @@ export default function App() {
           <RestaurantDetailScreen
             restaurantId={selectedRestaurantId}
             cartCount={cartCount}
-            onBack={() => setCurrentScreen('home')}
-            onNavigateToCart={() => openCart('restaurant')}
+            onBack={goBack}
+            onNavigateToCart={() => navigateTo('cart')}
             onAddToCart={handleAddToCart}
           />
         )}
@@ -217,27 +242,28 @@ export default function App() {
             onUpdateQuantity={handleUpdateQuantity}
             onRemoveItem={handleRemoveItem}
             onClearCart={handleClearCart}
-            onBack={() => setCurrentScreen(cartReturnScreen)}
-            onOrderSuccess={() => setCurrentScreen('orders')}
+            onBack={goBack}
+            onBrowseRestaurants={() => resetTo('home')}
+            onOrderSuccess={() => resetTo('orders', ['home'])}
           />
         )}
 
         {currentScreen === 'orders' && (
           <OrdersScreen
-            onBack={() => setCurrentScreen('home')}
+            onBack={goBack}
             onSelectRestaurant={(id) => {
               setSelectedRestaurantId(id);
-              setCurrentScreen('restaurant');
+              navigateTo('restaurant');
             }}
           />
         )}
 
         {currentScreen === 'profile' && (
           <ProfileScreen
-            onBack={() => setCurrentScreen('home')}
-            onNavigateToAuth={() => setCurrentScreen('auth')}
-            onNavigateToOrders={() => setCurrentScreen('orders')}
-            onNavigateToCart={() => openCart('profile')}
+            onBack={goBack}
+            onNavigateToAuth={() => navigateTo('auth')}
+            onNavigateToOrders={() => navigateTo('orders')}
+            onNavigateToCart={() => navigateTo('cart')}
             onLogout={handleLogout}
           />
         )}
@@ -284,9 +310,6 @@ export default function App() {
 }
 
 const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-  },
   hidden: {
     display: 'none',
   },
@@ -341,8 +364,11 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontWeight: 'bold',
   },
-  root: {
+  safeArea: {
   flex: 1,
-  backgroundColor: '#1A1A1A', 
+  backgroundColor: '#FFFFFF',
+  },
+  root: {
+    flex: 1,
   },
 });
