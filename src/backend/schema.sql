@@ -77,6 +77,14 @@ CREATE TABLE orders (
   total_price numeric(10, 2) NOT NULL,
   total_calories int,
   delivery_address text NOT NULL,
+  delivery_latitude decimal,
+  delivery_longitude decimal,
+  CONSTRAINT orders_delivery_coordinates_pair
+    CHECK ((delivery_latitude IS NULL) = (delivery_longitude IS NULL)),
+  CONSTRAINT orders_delivery_latitude_range
+    CHECK (delivery_latitude BETWEEN -90 AND 90),
+  CONSTRAINT orders_delivery_longitude_range
+    CHECK (delivery_longitude BETWEEN -180 AND 180),
   created_at timestamp DEFAULT now()
 );
 

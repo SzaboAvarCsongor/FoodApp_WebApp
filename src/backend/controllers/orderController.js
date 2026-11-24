@@ -7,6 +7,8 @@ export const createOrder = async (req, res) => {
     delivery_fee,
     total_price,
     total_calories,
+    delivery_latitude,
+    delivery_longitude,
     items,
   } = req.body;
 
@@ -14,6 +16,23 @@ export const createOrder = async (req, res) => {
     return res.status(400).json({
       error: 'Hiányzó adatok a rendelés leadásához (restaurant_id, delivery_address, items)!',
     });
+  }
+
+  const hasLatitude = delivery_latitude !== undefined && delivery_latitude !== null;
+  const hasLongitude = delivery_longitude !== undefined && delivery_longitude !== null;
+  if (
+    hasLatitude !== hasLongitude ||
+    (hasLatitude &&
+      (typeof delivery_latitude !== 'number' ||
+        typeof delivery_longitude !== 'number' ||
+        !Number.isFinite(delivery_latitude) ||
+        !Number.isFinite(delivery_longitude) ||
+        Number(delivery_latitude) < -90 ||
+        Number(delivery_latitude) > 90 ||
+        Number(delivery_longitude) < -180 ||
+        Number(delivery_longitude) > 180))
+  ) {
+    return res.status(400).json({ error: 'Érvénytelen szállítási koordináták.' });
   }
 
   try {
@@ -24,6 +43,8 @@ export const createOrder = async (req, res) => {
           customer_id: req.user.id,
           restaurant_id,
           delivery_address,
+          delivery_latitude: hasLatitude ? Number(delivery_latitude) : null,
+          delivery_longitude: hasLongitude ? Number(delivery_longitude) : null,
           delivery_fee: delivery_fee || 0,
           total_price,
           total_calories: total_calories || null,

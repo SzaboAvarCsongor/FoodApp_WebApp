@@ -19,7 +19,11 @@ const roundMoney = (value) => Math.round(Number(value) * 100) / 100;
 export default function CartScreen({
   cartItems = [],
   restaurantId,
-  deliveryFee: deliveryFeeProp = DEFAULT_DELIVERY_FEE,
+  deliveryFee: propDeliveryFee,
+  deliveryAddress: propDeliveryAddress,
+  deliveryCoords,
+  onOpenAddressPicker,
+  onDeliveryAddressChange,
   onUpdateQuantity,
   onRemoveItem,
   onClearCart,
@@ -29,22 +33,15 @@ export default function CartScreen({
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [orderPlaced, setOrderPlaced] = useState(false);
-  const [deliveryAddress, setDeliveryAddress] = useState('');
+  const [addressText, setAddressText] = useState(propDeliveryAddress || '');
 
   useEffect(() => {
-    let active = true;
-    AsyncStorage.getItem('deliveryAddress')
-      .then((address) => {
-        if (active && address) setDeliveryAddress(address);
-      })
-      .catch((error) => console.error('Mentett cím betöltési hiba:', error));
+    setAddressText(propDeliveryAddress || '');
+    setErrorMessage('');
+  }, [propDeliveryAddress]);
 
-    return () => {
-      active = false;
-    };
-  }, []);
-
-  const deliveryFee = cartItems.length > 0 ? roundMoney(deliveryFeeProp) : 0;
+  const effectiveDeliveryFee = propDeliveryFee ?? DEFAULT_DELIVERY_FEE;
+  const deliveryFee = cartItems.length > 0 ? roundMoney(effectiveDeliveryFee) : 0;
   const itemsTotal = roundMoney(
     cartItems.reduce((sum, item) => sum + Number(item.price) * item.quantity, 0)
   );
@@ -58,10 +55,16 @@ export default function CartScreen({
       return;
     }
 
-    if (!deliveryAddress.trim()) {
-      setErrorMessage('Add meg a szállítási címedet a rendelés leadásához.');
+    if (!addressText.trim()) {
+      setErrorMessage('Add meg vagy válaszd ki a térképen a szállítási címedet.');
       return;
     }
+
+    const hasMatchingCoords =
+      propDeliveryAddress?.trim() === addressText.trim() &&
+      Number.isFinite(deliveryCoords?.latitude) &&
+      Number.isFinite(deliveryCoords?.longitude);
+    const orderCoords = hasMatchingCoords ? deliveryCoords : null;
 
     setLoading(true);
     setErrorMessage('');
@@ -69,7 +72,9 @@ export default function CartScreen({
     try {
       const orderPayload = {
         restaurant_id: restaurantId,
-        delivery_address: deliveryAddress.trim(),
+        delivery_address: addressText.trim(),
+        delivery_latitude: orderCoords?.latitude ?? null,
+        delivery_longitude: orderCoords?.longitude ?? null,
         delivery_fee: deliveryFee,
         total_price: grandTotal,
         total_calories: cartItems.reduce(
@@ -89,10 +94,14 @@ export default function CartScreen({
       });
 
       try {
-        await AsyncStorage.setItem('deliveryAddress', deliveryAddress.trim());
+        await AsyncStorage.multiSet([
+          ['deliveryAddress', addressText.trim()],
+          ['deliveryCoords', JSON.stringify(orderCoords)],
+        ]);
       } catch (error) {
         console.error('Mentett cím frissítési hiba:', error);
       }
+
       onClearCart?.();
       setOrderPlaced(true);
     } catch (error) {
@@ -215,6 +224,31 @@ export default function CartScreen({
           ))}
         </View>
 
+        {/* Szállítási cím + Google Maps gomb */}
+        <View style={styles.addressCard}>
+          <View style={styles.addressHeaderRow}>
+            <Text style={styles.addressTitle}>Szállítási cím</Text>
+            {onOpenAddressPicker && (
+              <TouchableOpacity style={styles.mapBtn} onPress={onOpenAddressPicker}>
+                <Text style={styles.mapBtnText}>📍 Térkép</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+
+          <TextInput
+            style={styles.addressInput}
+            value={addressText}
+            onChangeText={(value) => {
+              setAddressText(value);
+              setErrorMessage('');
+              onDeliveryAddressChange?.(value);
+            }}
+            placeholder="Utca, házszám, emelet / ajtó"
+            autoCapitalize="words"
+            returnKeyType="done"
+          />
+        </View>
+
         <View style={styles.summaryCard}>
           <Text style={styles.summaryTitle}>Összegzés</Text>
 
@@ -232,18 +266,6 @@ export default function CartScreen({
             <Text style={styles.totalLabel}>Végösszeg</Text>
             <Text style={styles.totalValue}>{grandTotal} lej</Text>
           </View>
-        </View>
-
-        <View style={styles.addressCard}>
-          <Text style={styles.summaryTitle}>Szállítási cím</Text>
-          <TextInput
-            style={styles.addressInput}
-            value={deliveryAddress}
-            onChangeText={setDeliveryAddress}
-            placeholder="Utca, házszám, város"
-            autoCapitalize="words"
-            returnKeyType="done"
-          />
         </View>
       </ScrollView>
 
@@ -310,7 +332,7 @@ const styles = StyleSheet.create({
     paddingTop: 16,
   },
   section: {
-    marginBottom: 20,
+    marginBottom: 16,
   },
   sectionTitle: {
     fontSize: 18,
@@ -382,23 +404,38 @@ const styles = StyleSheet.create({
   removeBtnText: {
     fontSize: 16,
   },
-  summaryCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: '#EFEBE4',
-    marginBottom: 30,
-  },
   addressCard: {
     backgroundColor: '#FFFFFF',
     borderRadius: 16,
     padding: 16,
     borderWidth: 1,
     borderColor: '#EFEBE4',
-    marginBottom: 24,
+    marginBottom: 16,
+  },
+  addressHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  addressTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#1A1A1A',
+  },
+  mapBtn: {
+    backgroundColor: '#FFF2EB',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 10,
+  },
+  mapBtnText: {
+    fontSize: 13,
+    fontWeight: 'bold',
+    color: '#FF5722',
   },
   addressInput: {
+    backgroundColor: '#FAF8F5',
     borderWidth: 1,
     borderColor: '#EFEBE4',
     borderRadius: 10,
@@ -406,6 +443,14 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     fontSize: 15,
     color: '#1A1A1A',
+  },
+  summaryCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#EFEBE4',
+    marginBottom: 30,
   },
   summaryTitle: {
     fontSize: 16,
